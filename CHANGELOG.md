@@ -7,6 +7,11 @@
 - Fixed NZB fetching to use Spotweb's real built-in Newznab-compatible API
   (`{base}/api?t=get&id={messageid}&apikey={apikey}`) instead of an assumed
   URL that only worked against session-authenticated HTML pages.
+- Fixed existing installs never picking up the corrected NZB template above:
+  it was only used for brand-new databases, so upgraded installs kept the
+  old, broken guess in their settings row forever. Boot now auto-heals it
+  in place (only when it's still exactly the old broken value, so a
+  manually customized template is left alone).
 - New: admin-managed local folder shares. Admins name and assign folders to
   specific users; assigned users get an inline browser on the dashboard
   (breadcrumbs, file downloads, whole-folder zip downloads, auto-refresh)

@@ -165,15 +165,24 @@ func Open(path string) (*Store, error) {
 			return nil, fmt.Errorf("migrating users table: %w", err)
 		}
 	}
-	// Same idea for the admin-level fallback Spotweb API key and the NZB
-	// template's new default (installs from before the real Spotweb API
-	// endpoint was known keep their old, non-working template value here —
-	// see the field hint in the admin UI for how to update it).
+	// Same idea for the admin-level fallback Spotweb API key.
 	if _, err := db.Exec(`ALTER TABLE settings ADD COLUMN spotweb_api_key TEXT NOT NULL DEFAULT ''`); err != nil {
 		if !strings.Contains(strings.ToLower(err.Error()), "duplicate column") {
 			db.Close()
 			return nil, fmt.Errorf("migrating settings table: %w", err)
 		}
+	}
+
+	// Installs from before the real Spotweb Newznab-style API endpoint was
+	// known got seeded with a guessed template that only ever returned an
+	// HTML login page. Heal it in place: only overwrite when the stored
+	// value is still exactly that known-broken guess, so any template an
+	// admin has since customized is left untouched.
+	const brokenGuessedTemplate = "{base}/index.php?page=getnzb&messageid={messageid}"
+	if _, err := db.Exec(`UPDATE settings SET spotweb_nzb_template = ? WHERE id = 1 AND spotweb_nzb_template = ?`,
+		DefaultSettings().SpotwebNZBTemplate, brokenGuessedTemplate); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("healing spotweb_nzb_template: %w", err)
 	}
 
 	return &Store{db: db}, nil
