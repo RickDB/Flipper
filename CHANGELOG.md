@@ -2,12 +2,22 @@
 
 ## Unreleased
 
+- No unreleased changes yet.
+
+## 0.04 — 2026-08-27
+
 - Improved shared-folder action alignment and spacing, with a stronger
   irreversible-delete warning to help prevent accidental removal.
+
+## 0.03 — 2026-08-27
+
 - Share access can now grant individual users permission to permanently
   delete files and folders, with server-side authorization and path checks.
 - The shared-folder ZIP download action now uses a compact listing footer
   instead of an oversized pill button.
+
+## 0.02 — 2026-08-27
+
 - SABnzbd uploads now use the Spotweb release title instead of the Spotnet
   message ID, while preserving spaces in the displayed release name.
 - Release names in recent history now link to their submitted Spotweb URL.
@@ -32,7 +42,7 @@
   (breadcrumbs, file downloads, whole-folder zip downloads, auto-refresh)
   with path-traversal-safe access on every request.
 
-## 0.01
+## 0.01 — 2026-08-27
 
 Initial release.
 
