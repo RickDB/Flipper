@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- SABnzbd uploads now use the Spotweb release title instead of the Spotnet
+  message ID, while preserving spaces in the displayed release name.
+- Release names in recent history now link to their submitted Spotweb URL.
 - Per-user personal Spotweb API key (Account page), with an admin-level
   fallback key so Flipper works before anyone sets their own.
 - Fixed NZB fetching to use Spotweb's real built-in Newznab-compatible API
