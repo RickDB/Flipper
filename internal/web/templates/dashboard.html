@@ -28,14 +28,21 @@
 </div>
 
 <div class="card">
-  <h2><span class="emoji-icon">📜</span> Recent history</h2>
+  <div class="history-heading">
+    <h2><span class="emoji-icon">📜</span> Recent history</h2>
+    {{if .HistoryTotal}}
+    <form method="post" action="/history/delete-all" onsubmit="return confirm('{{if .User.IsAdmin}}Permanently delete all history for every user?{{else}}Permanently delete all of your history entries?{{end}}\n\nThis cannot be undone.');">
+      <button type="submit" class="history-clear">🗑 {{if .User.IsAdmin}}Clear all{{else}}Clear mine{{end}}</button>
+    </form>
+    {{end}}
+  </div>
   <div class="card-sub">
     {{if .HistoryTotal}}Showing {{len .History}} of {{.HistoryTotal}} (page {{.HistoryPage}} of {{.HistoryTotalPages}}) &mdash; up to 100 kept.{{else}}Nothing sent yet.{{end}}
   </div>
   {{if .History}}
   <div style="overflow-x:auto;">
   <table>
-    <thead><tr><th>When</th><th>By</th><th>Release</th><th>Category</th><th>Status</th><th>Detail</th></tr></thead>
+    <thead><tr><th>When</th><th>By</th><th>Release</th><th>Category</th><th>Status</th><th>Detail</th><th></th></tr></thead>
     <tbody>
     {{range .History}}
       <tr>
@@ -45,6 +52,11 @@
         <td>{{.Category}}</td>
         <td>{{if .Success}}<span class="badge badge-ok">Added</span>{{else}}<span class="badge badge-fail">Failed</span>{{end}}</td>
         <td>{{if .Success}}&mdash;{{else}}{{.Message}}{{end}}</td>
+        <td>{{if or $.User.IsAdmin (eq .Username $.User.Username)}}
+          <form method="post" action="/history/{{.ID}}/delete" onsubmit="return confirm('Delete this history item?');">
+            <button type="submit" class="history-delete" aria-label="Delete history item" title="Delete history item">🗑</button>
+          </form>
+        {{end}}</td>
       </tr>
     {{end}}
     </tbody>
@@ -64,6 +76,25 @@
   {{else}}
   <div class="empty-state">Nothing sent yet — items you send will show up here.</div>
   {{end}}
+</div>
+
+<div class="card" id="downloads-card">
+  <div class="downloads-heading">
+    <h2><span class="emoji-icon">⬇️</span> Downloads</h2>
+    {{if .Downloads}}
+    <form method="post" action="/downloads/clear-all" onsubmit="return confirm('{{if .User.IsAdmin}}Clear all tracked downloads for every user?{{else}}Clear all of your tracked downloads?{{end}}\n\nThis only removes them from this card; SABnzbd jobs are not changed.');">
+      <button type="submit" class="downloads-clear">🧹 {{if .User.IsAdmin}}Clear all{{else}}Clear mine{{end}}</button>
+    </form>
+    {{end}}
+  </div>
+  <div class="card-sub">Live SABnzbd progress for the latest releases added through Flipper.</div>
+  <div id="downloads-list">
+    {{if .Downloads}}
+      {{range .Downloads}}<div class="download-item loading"><strong>{{.Title}}</strong><span>Checking SABnzbd…</span></div>{{end}}
+    {{else}}
+      <div class="empty-state">No tracked downloads yet.</div>
+    {{end}}
+  </div>
 </div>
 
 </div>
@@ -89,6 +120,69 @@
 </div>
 
 <script>
+(function () {
+  var list = document.getElementById('downloads-list');
+  if (!list || list.querySelector('.empty-state')) return;
+  var timer = null;
+  var refreshing = false;
+
+  function escapeHtml(s) {
+    var d = document.createElement('div');
+    d.textContent = s == null ? '' : String(s);
+    return d.innerHTML;
+  }
+
+  function render(data) {
+    if (!data.ok) {
+      list.querySelectorAll('.download-item').forEach(function (el) { el.classList.remove('loading'); });
+      return;
+    }
+    var items = data.items || [];
+    if (!items.length) {
+      list.innerHTML = '<div class="empty-state">No tracked downloads yet.</div>';
+      if (timer) clearInterval(timer);
+      return;
+    }
+    list.innerHTML = items.map(function (item) {
+      var clear = item.canClear
+        ? '<form class="download-clear-form" method="post" action="/downloads/' + encodeURIComponent(item.historyId) + '/clear" onsubmit="return confirm(\'Remove this item from the Downloads card?\\n\\nThe SABnzbd job will not be changed.\');"><button type="submit" class="download-clear" title="Remove from Downloads" aria-label="Remove from Downloads">×</button></form>'
+        : '';
+      if (!item.found) {
+        return '<div class="download-item"><div class="download-head"><strong>' + escapeHtml(item.title) +
+          '</strong><span class="download-head-actions"><span class="download-state unknown">Not found</span>' + clear + '</span></div>' +
+          '<div class="download-meta">This job is no longer present in the SABnzbd queue or history.</div></div>';
+      }
+      var s = item.status || {};
+      var pct = Number(s.percentage);
+      var hasPct = isFinite(pct) && pct >= 0;
+      pct = hasPct ? Math.max(0, Math.min(100, pct)) : 0;
+      var stateClass = String(s.state || 'unknown').toLowerCase().replace(/[^a-z0-9_-]/g, '-');
+      var progress = hasPct
+        ? '<div class="download-progress"><span style="width:' + pct + '%"></span></div>'
+        : '';
+      var percentage = hasPct ? '<span><b>' + pct + '%</b> done · ' + (100 - pct) + '% left</span>' : '<span>Progress unavailable</span>';
+      return '<div class="download-item"><div class="download-head"><strong>' + escapeHtml(item.title) +
+        '</strong><span class="download-head-actions"><span class="download-state ' + stateClass + '">' + escapeHtml(s.state || 'Unknown') + '</span>' + clear + '</span></div>' +
+        progress + '<div class="download-meta">' + percentage + '<span><b>' + escapeHtml(s.sizeLeft || '—') +
+        '</b> left</span><span>Time left: <b>' + escapeHtml(s.timeLeft || '—') + '</b></span></div></div>';
+    }).join('');
+  }
+
+  function refresh() {
+    if (refreshing) return;
+    refreshing = true;
+    fetch('/downloads/status', {headers: {'Accept': 'application/json'}})
+      .then(function (r) { return r.json(); })
+      .then(render)
+      .catch(function () {})
+      .finally(function () { refreshing = false; });
+  }
+
+  refresh();
+  timer = setInterval(refresh, 3000);
+  window.addEventListener('beforeunload', function () { clearInterval(timer); });
+})();
+
 (function () {
   var tabsEl = document.getElementById('share-tabs');
   if (tabsEl) {

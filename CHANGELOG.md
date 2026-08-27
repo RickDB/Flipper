@@ -4,6 +4,15 @@
 
 - No unreleased changes yet.
 
+## 0.05 — 2026-08-27
+
+- Users can delete individual history entries they own or clear all of their
+  history; admins can delete any entry or clear history for every user.
+- A dedicated Downloads card now shows live SABnzbd state, percentage done
+  and left, remaining size, and estimated time for Flipper-submitted jobs.
+- Tracked downloads can be cleared individually or in bulk without changing
+  or cancelling the underlying SABnzbd jobs.
+
 ## 0.04 — 2026-08-27
 
 - Improved shared-folder action alignment and spacing, with a stronger

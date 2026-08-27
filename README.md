@@ -23,12 +23,19 @@ themed UI. Default port **19012**.
 - Each user can optionally set their own personal Spotweb API key on their
   Account page, which takes priority over the admin's fallback key —
   downloads then count against that user's own Spotweb account.
-- Last 10 send attempts (success and failure) are kept as history.
+- Up to 100 send attempts are kept as paginated history. Release names link
+  back to Spotweb; users can delete their own entries or clear their own
+  history, while admins can manage the complete history.
+- A dedicated Downloads card tracks the latest jobs submitted through
+  Flipper and refreshes from SABnzbd every three seconds, showing state,
+  percentage done/left, remaining size, and estimated time. Tracking can be
+  cleared without cancelling or deleting the underlying SABnzbd job.
 - Admin can share local folders with specific users under a name of the
   admin's choosing (independent of the real folder path). Assigned users
   get an inline browser right on the dashboard — no page reloads — with
   breadcrumb navigation, single-file downloads, whole-folder zip downloads,
-  and automatic refresh so newly-added files just show up.
+  and automatic refresh so newly-added files just show up. Access and
+  permanent file/folder deletion can be granted independently per user.
 
 ## Container image
 
@@ -37,7 +44,7 @@ Pushed to GHCR on every push to `main` (and on `v*` tags) by
 
 ```
 ghcr.io/rickdb/flipper:latest
-ghcr.io/rickdb/flipper:0.01
+ghcr.io/rickdb/flipper:0.05
 ```
 
 GHCR packages built from a workflow's default `GITHUB_TOKEN` are private by
@@ -78,7 +85,7 @@ is configured from the Admin panel in the UI and stored in the database.
 
 ## Manual / bare-metal build
 
-Requires Go 1.23+.
+Requires Go 1.25+.
 
 ```bash
 go build -o flipper ./cmd/flipper
@@ -128,7 +135,10 @@ Under Admin → Local folder shares, an admin can add any folder Flipper can
 see on disk and give it a display name — the name is what users see; the
 real path never is. Each share can then be assigned to specific regular
 users (checkboxes, same pattern as SABnzbd categories). Admins always see
-every share.
+every share. Delete permission is a separate per-user grant: users without
+it have read/download-only access, while users with it can permanently
+delete files and folders after an explicit irreversible-action warning. The
+configured share root itself cannot be deleted.
 
 Assigned users get a "Shared folders" card directly on their dashboard: a
 tab per share, an inline directory browser (breadcrumbs, click a folder to
@@ -137,13 +147,30 @@ go in, click a file's download link to grab it, or "Download this folder as
 so a file dropped into a shared folder on disk shows up without anyone
 reloading the page — there's no filesystem watcher, just a cheap poll.
 
-Path handling is defensive: every browse/download/zip request re-resolves
+Path handling is defensive: every browse/download/zip/delete request re-resolves
 the requested path against the share's root and rejects anything that would
 escape it (`../..` and friends), regardless of what the client sends.
 
 Running under Docker Compose, the share path you configure in the Admin
 panel is the path **inside the container**, so bind-mount the host folder
 first — see the commented example in [`compose.yaml`](compose.yaml).
+
+## History and live downloads
+
+Flipper keeps the newest 100 send attempts and displays them 10 per page.
+Each successful release links back to its submitted Spotweb URL. Regular
+users can delete individual entries they own or clear their own history;
+admins can delete any entry or clear history for everyone.
+
+For newly submitted releases, Flipper stores SABnzbd's returned job ID and
+shows it in a separate Downloads card. The card polls SABnzbd's queue and
+history every three seconds and reports download percentage, percentage and
+size remaining, estimated time left, and states such as queued, downloading,
+repairing, unpacking, failed, or completed. An item can be removed from this
+tracking card individually or in bulk; doing so never cancels or removes the
+actual SABnzbd job and does not delete the corresponding Flipper history row.
+Jobs submitted before version 0.05 do not have a stored SABnzbd ID and
+therefore cannot appear retroactively in the Downloads card.
 
 ## Self-signed certificates
 
@@ -164,4 +191,4 @@ self-signed certs. Leave it unchecked unless you need it.
 
 ## Version
 
-Current version: **0.04**
+Current version: **0.05**

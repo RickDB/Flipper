@@ -11,6 +11,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -118,6 +119,104 @@ type addResp struct {
 	Status bool     `json:"status"`
 	NzoIDs []string `json:"nzo_ids"`
 	Error  string   `json:"error"`
+}
+
+// DownloadStatus is the normalized subset of SABnzbd queue/history data
+// shown by Flipper's live downloads card.
+type DownloadStatus struct {
+	NZOID      string `json:"nzoId"`
+	State      string `json:"state"`
+	Percentage int    `json:"percentage"`
+	SizeLeft   string `json:"sizeLeft"`
+	TimeLeft   string `json:"timeLeft"`
+}
+
+type statusSlot struct {
+	NZOID      string `json:"nzo_id"`
+	Status     string `json:"status"`
+	Percentage any    `json:"percentage"`
+	SizeLeft   string `json:"sizeleft"`
+	TimeLeft   string `json:"timeleft"`
+}
+
+func percentageValue(v any) int {
+	switch value := v.(type) {
+	case string:
+		n, err := strconv.Atoi(strings.TrimSuffix(value, "%"))
+		if err == nil {
+			return n
+		}
+	case float64:
+		return int(value)
+	}
+	return -1
+}
+
+func (c *Client) getJSON(params url.Values, dst any) error {
+	req, err := http.NewRequest(http.MethodGet, c.apiURL(params), nil)
+	if err != nil {
+		return err
+	}
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("could not reach SABnzbd: %w", err)
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("SABnzbd returned HTTP %d: %s", resp.StatusCode, trim(body))
+	}
+	if err := json.Unmarshal(body, dst); err != nil {
+		return fmt.Errorf("could not parse SABnzbd response: %s", trim(body))
+	}
+	if apiErr := parseAPIError(body); apiErr != "" {
+		return fmt.Errorf("SABnzbd error: %s", apiErr)
+	}
+	return nil
+}
+
+// GetDownloadStatuses looks up selected jobs in both the active queue and
+// completed/failed history. SABnzbd supports filtering both calls by nzo_id.
+func (c *Client) GetDownloadStatuses(nzoIDs []string) (map[string]DownloadStatus, error) {
+	result := make(map[string]DownloadStatus, len(nzoIDs))
+	if len(nzoIDs) == 0 {
+		return result, nil
+	}
+	filter := strings.Join(nzoIDs, ",")
+	var queue struct {
+		Queue struct {
+			Slots []statusSlot `json:"slots"`
+		} `json:"queue"`
+	}
+	if err := c.getJSON(url.Values{"mode": {"queue"}, "nzo_ids": {filter}, "limit": {"100"}}, &queue); err != nil {
+		return nil, err
+	}
+	for _, slot := range queue.Queue.Slots {
+		result[slot.NZOID] = DownloadStatus{
+			NZOID: slot.NZOID, State: slot.Status, Percentage: percentageValue(slot.Percentage),
+			SizeLeft: slot.SizeLeft, TimeLeft: slot.TimeLeft,
+		}
+	}
+
+	var history struct {
+		History struct {
+			Slots []statusSlot `json:"slots"`
+		} `json:"history"`
+	}
+	if err := c.getJSON(url.Values{"mode": {"history"}, "nzo_ids": {filter}, "limit": {"100"}}, &history); err != nil {
+		return nil, err
+	}
+	for _, slot := range history.History.Slots {
+		percentage := -1
+		if strings.EqualFold(slot.Status, "completed") {
+			percentage = 100
+		}
+		result[slot.NZOID] = DownloadStatus{
+			NZOID: slot.NZOID, State: slot.Status, Percentage: percentage,
+			SizeLeft: "0 B", TimeLeft: "—",
+		}
+	}
+	return result, nil
 }
 
 // AddNZB uploads raw NZB file bytes to SABnzbd under the given category.

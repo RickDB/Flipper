@@ -58,6 +58,11 @@ func (s *Server) Routes() http.Handler {
 
 	mux.HandleFunc("GET /{$}", s.requireAuth(s.handleDashboard))
 	mux.HandleFunc("POST /submit", s.requireAuth(s.handleSubmit))
+	mux.HandleFunc("POST /history/{id}/delete", s.requireAuth(s.handleHistoryDelete))
+	mux.HandleFunc("POST /history/delete-all", s.requireAuth(s.handleHistoryDeleteAll))
+	mux.HandleFunc("GET /downloads/status", s.requireAuth(s.handleDownloadStatus))
+	mux.HandleFunc("POST /downloads/{id}/clear", s.requireAuth(s.handleDownloadClear))
+	mux.HandleFunc("POST /downloads/clear-all", s.requireAuth(s.handleDownloadsClearAll))
 	mux.HandleFunc("GET /account", s.requireAuth(s.handleAccountForm))
 	mux.HandleFunc("POST /account", s.requireAuth(s.handleAccountSubmit))
 	mux.HandleFunc("POST /account/spotweb-key", s.requireAuth(s.handleAccountSpotwebKeySubmit))
@@ -312,6 +317,7 @@ type dashboardData struct {
 	Categories        []string
 	DefaultCategory   string
 	History           []store.HistoryItem
+	Downloads         []store.HistoryItem
 	PrefillURL        string
 	Shares            []store.Share
 	HistoryTotal      int
@@ -347,6 +353,7 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request, sess au
 		Categories:        settings.AllowedCategories,
 		DefaultCategory:   settings.DefaultCategory,
 		History:           s.store.ListHistoryPage((page-1)*historyPageSize, historyPageSize),
+		Downloads:         s.store.ListTrackedDownloads(10),
 		Shares:            s.store.ListSharesForUser(sess.UserID, sess.IsAdmin),
 		HistoryTotal:      total,
 		HistoryPage:       page,
@@ -354,6 +361,90 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request, sess au
 		HistoryPages:      pages,
 	}
 	s.render(w, "dashboard_page", data)
+}
+
+func (s *Server) handleDownloadStatus(w http.ResponseWriter, r *http.Request, sess auth.Session) {
+	downloads := s.store.ListTrackedDownloads(10)
+	ids := make([]string, 0, len(downloads))
+	for _, download := range downloads {
+		ids = append(ids, download.NZOID)
+	}
+	settings := s.store.GetSettings()
+	client := sabnzbd.New(settings.SabnzbdURL, settings.SabnzbdAPIKey, settings.SabnzbdSkipVerify)
+	statuses, err := client.GetDownloadStatuses(ids)
+	if err != nil {
+		writeJSON(w, map[string]any{"ok": false, "message": err.Error()})
+		return
+	}
+	items := make([]map[string]any, 0, len(downloads))
+	for _, download := range downloads {
+		status, found := statuses[download.NZOID]
+		items = append(items, map[string]any{
+			"historyId": download.ID,
+			"title":     download.Title,
+			"nzoId":     download.NZOID,
+			"found":     found,
+			"status":    status,
+			"canClear":  sess.IsAdmin || download.Username == sess.Username,
+		})
+	}
+	writeJSON(w, map[string]any{"ok": true, "items": items})
+}
+
+func (s *Server) handleDownloadClear(w http.ResponseWriter, r *http.Request, sess auth.Session) {
+	id := strings.TrimSpace(r.PathValue("id"))
+	cleared, err := s.store.ClearTrackedDownload(id, sess.Username, sess.IsAdmin)
+	if err != nil {
+		redirectFlash(w, r, "/", false, "Could not clear download: "+err.Error())
+		return
+	}
+	if !cleared {
+		redirectFlash(w, r, "/", false, "Download not found or you cannot clear it")
+		return
+	}
+	redirectFlash(w, r, "/", true, "Download removed from tracking (the SABnzbd job was not changed)")
+}
+
+func (s *Server) handleDownloadsClearAll(w http.ResponseWriter, r *http.Request, sess auth.Session) {
+	if err := s.store.ClearTrackedDownloads(sess.Username, sess.IsAdmin); err != nil {
+		redirectFlash(w, r, "/", false, "Could not clear downloads: "+err.Error())
+		return
+	}
+	message := "Your downloads were removed from tracking"
+	if sess.IsAdmin {
+		message = "All downloads were removed from tracking"
+	}
+	redirectFlash(w, r, "/", true, message+" (SABnzbd jobs were not changed)")
+}
+
+func (s *Server) handleHistoryDelete(w http.ResponseWriter, r *http.Request, sess auth.Session) {
+	id := strings.TrimSpace(r.PathValue("id"))
+	if id == "" {
+		redirectFlash(w, r, "/", false, "Invalid history item")
+		return
+	}
+	deleted, err := s.store.DeleteHistoryItem(id, sess.Username, sess.IsAdmin)
+	if err != nil {
+		redirectFlash(w, r, "/", false, "Could not delete history item: "+err.Error())
+		return
+	}
+	if !deleted {
+		redirectFlash(w, r, "/", false, "History item not found or you cannot delete it")
+		return
+	}
+	redirectFlash(w, r, "/", true, "History item deleted")
+}
+
+func (s *Server) handleHistoryDeleteAll(w http.ResponseWriter, r *http.Request, sess auth.Session) {
+	if err := s.store.ClearHistory(sess.Username, sess.IsAdmin); err != nil {
+		redirectFlash(w, r, "/", false, "Could not clear history: "+err.Error())
+		return
+	}
+	message := "Your history was cleared"
+	if sess.IsAdmin {
+		message = "All history was cleared"
+	}
+	redirectFlash(w, r, "/", true, message)
 }
 
 func (s *Server) handleSubmit(w http.ResponseWriter, r *http.Request, sess auth.Session) {
@@ -374,13 +465,14 @@ func (s *Server) handleSubmit(w http.ResponseWriter, r *http.Request, sess auth.
 		return
 	}
 
-	record := func(messageID, title string, success bool, message string) {
+	record := func(messageID, nzoID, title string, success bool, message string) {
 		_ = s.store.AddHistory(store.HistoryItem{
 			ID:        fmt.Sprintf("%d", time.Now().UnixNano()),
 			Timestamp: time.Now(),
 			Username:  sess.Username,
 			SpotURL:   spotURL,
 			MessageID: messageID,
+			NZOID:     nzoID,
 			Title:     title,
 			Category:  category,
 			Success:   success,
@@ -390,7 +482,7 @@ func (s *Server) handleSubmit(w http.ResponseWriter, r *http.Request, sess auth.
 
 	messageID, err := spotweb.ExtractMessageID(spotURL)
 	if err != nil {
-		record("", "", false, err.Error())
+		record("", "", "", false, err.Error())
 		redirectFlash(w, r, "/", false, err.Error())
 		return
 	}
@@ -414,20 +506,24 @@ func (s *Server) handleSubmit(w http.ResponseWriter, r *http.Request, sess auth.
 
 	nzb, err := spotClient.FetchNZB(messageID, apiKey)
 	if err != nil {
-		record(messageID, title, false, "Spotweb: "+err.Error())
+		record(messageID, "", title, false, "Spotweb: "+err.Error())
 		redirectFlash(w, r, "/", false, "Could not fetch the NZB from Spotweb: "+err.Error())
 		return
 	}
 
 	sabClient := sabnzbd.New(settings.SabnzbdURL, settings.SabnzbdAPIKey, settings.SabnzbdSkipVerify)
-	_, err = sabClient.AddNZB(sanitizeFilename(title)+".nzb", nzb, category)
+	nzoIDs, err := sabClient.AddNZB(sanitizeFilename(title)+".nzb", nzb, category)
 	if err != nil {
-		record(messageID, title, false, "SABnzbd: "+err.Error())
+		record(messageID, "", title, false, "SABnzbd: "+err.Error())
 		redirectFlash(w, r, "/", false, "SABnzbd rejected the release: "+err.Error())
 		return
 	}
 
-	record(messageID, title, true, "Added to SABnzbd: "+title)
+	nzoID := ""
+	if len(nzoIDs) > 0 {
+		nzoID = nzoIDs[0]
+	}
+	record(messageID, nzoID, title, true, "Added to SABnzbd: "+title)
 	redirectFlash(w, r, "/", true, "🐬 Sent \""+title+"\" to SABnzbd under category \""+category+"\"")
 }
 

@@ -57,6 +57,7 @@ type HistoryItem struct {
 	Username  string
 	SpotURL   string
 	MessageID string
+	NZOID     string // SABnzbd job id returned when the NZB was accepted
 	Title     string // release title fetched from Spotweb's API; falls back to MessageID when unavailable
 	Category  string
 	Success   bool
@@ -115,6 +116,7 @@ CREATE TABLE IF NOT EXISTS history (
 	username   TEXT NOT NULL,
 	spot_url   TEXT NOT NULL,
 	message_id TEXT NOT NULL,
+	nzo_id     TEXT NOT NULL DEFAULT '',
 	title      TEXT NOT NULL DEFAULT '',
 	category   TEXT NOT NULL,
 	success    INTEGER NOT NULL,
@@ -195,6 +197,12 @@ func Open(path string) (*Store, error) {
 		if !strings.Contains(strings.ToLower(err.Error()), "duplicate column") {
 			db.Close()
 			return nil, fmt.Errorf("migrating history table: %w", err)
+		}
+	}
+	if _, err := db.Exec(`ALTER TABLE history ADD COLUMN nzo_id TEXT NOT NULL DEFAULT ''`); err != nil {
+		if !strings.Contains(strings.ToLower(err.Error()), "duplicate column") {
+			db.Close()
+			return nil, fmt.Errorf("migrating history SABnzbd job ids: %w", err)
 		}
 	}
 
@@ -389,9 +397,9 @@ func (s *Store) AddHistory(item HistoryItem) error {
 	}
 	defer tx.Rollback()
 
-	_, err = tx.Exec(`INSERT INTO history (id, timestamp, username, spot_url, message_id, title, category, success, message)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		item.ID, item.Timestamp, item.Username, item.SpotURL, item.MessageID, item.Title, item.Category, boolToInt(item.Success), item.Message)
+	_, err = tx.Exec(`INSERT INTO history (id, timestamp, username, spot_url, message_id, nzo_id, title, category, success, message)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		item.ID, item.Timestamp, item.Username, item.SpotURL, item.MessageID, item.NZOID, item.Title, item.Category, boolToInt(item.Success), item.Message)
 	if err != nil {
 		return err
 	}
@@ -418,7 +426,7 @@ func (s *Store) CountHistory() int {
 // ListHistoryPage returns up to limit history rows, most recent first,
 // starting after the given offset.
 func (s *Store) ListHistoryPage(offset, limit int) []HistoryItem {
-	rows, err := s.db.Query(`SELECT id, timestamp, username, spot_url, message_id, title, category, success, message
+	rows, err := s.db.Query(`SELECT id, timestamp, username, spot_url, message_id, nzo_id, title, category, success, message
 		FROM history ORDER BY timestamp DESC LIMIT ? OFFSET ?`, limit, offset)
 	if err != nil {
 		return nil
@@ -428,13 +436,91 @@ func (s *Store) ListHistoryPage(offset, limit int) []HistoryItem {
 	for rows.Next() {
 		var h HistoryItem
 		var success int
-		if err := rows.Scan(&h.ID, &h.Timestamp, &h.Username, &h.SpotURL, &h.MessageID, &h.Title, &h.Category, &success, &h.Message); err != nil {
+		if err := rows.Scan(&h.ID, &h.Timestamp, &h.Username, &h.SpotURL, &h.MessageID, &h.NZOID, &h.Title, &h.Category, &success, &h.Message); err != nil {
 			continue
 		}
 		h.Success = success != 0
 		out = append(out, h)
 	}
 	return out
+}
+
+// ListTrackedDownloads returns the newest successful submissions that have
+// a SABnzbd job id, for live queue/history status display.
+func (s *Store) ListTrackedDownloads(limit int) []HistoryItem {
+	rows, err := s.db.Query(`SELECT id, timestamp, username, spot_url, message_id, nzo_id, title, category, success, message
+		FROM history WHERE success = 1 AND nzo_id <> '' ORDER BY timestamp DESC LIMIT ?`, limit)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+	var out []HistoryItem
+	for rows.Next() {
+		var h HistoryItem
+		var success int
+		if err := rows.Scan(&h.ID, &h.Timestamp, &h.Username, &h.SpotURL, &h.MessageID, &h.NZOID, &h.Title, &h.Category, &success, &h.Message); err != nil {
+			continue
+		}
+		h.Success = success != 0
+		out = append(out, h)
+	}
+	return out
+}
+
+// ClearTrackedDownload removes a job from Flipper's Downloads card without
+// changing the corresponding SABnzbd job or deleting its history row.
+func (s *Store) ClearTrackedDownload(historyID, username string, isAdmin bool) (bool, error) {
+	query := `UPDATE history SET nzo_id = '' WHERE id = ? AND nzo_id <> ''`
+	args := []any{historyID}
+	if !isAdmin {
+		query += ` AND username = ?`
+		args = append(args, username)
+	}
+	res, err := s.db.Exec(query, args...)
+	if err != nil {
+		return false, err
+	}
+	n, err := res.RowsAffected()
+	return n > 0, err
+}
+
+// ClearTrackedDownloads removes all tracking for admins, or only tracking
+// belonging to the current user for regular users.
+func (s *Store) ClearTrackedDownloads(username string, isAdmin bool) error {
+	if isAdmin {
+		_, err := s.db.Exec(`UPDATE history SET nzo_id = '' WHERE nzo_id <> ''`)
+		return err
+	}
+	_, err := s.db.Exec(`UPDATE history SET nzo_id = '' WHERE nzo_id <> '' AND username = ?`, username)
+	return err
+}
+
+// DeleteHistoryItem removes one history row. Admins may remove any row;
+// regular users are restricted to rows recorded under their username.
+func (s *Store) DeleteHistoryItem(id, username string, isAdmin bool) (bool, error) {
+	query := `DELETE FROM history WHERE id = ?`
+	args := []any{id}
+	if !isAdmin {
+		query += ` AND username = ?`
+		args = append(args, username)
+	}
+	res, err := s.db.Exec(query, args...)
+	if err != nil {
+		return false, err
+	}
+	n, err := res.RowsAffected()
+	return n > 0, err
+}
+
+// ClearHistory removes all history for admins, or only the current user's
+// rows for regular users.
+func (s *Store) ClearHistory(username string, isAdmin bool) error {
+	if isAdmin {
+		_, err := s.db.Exec(`DELETE FROM history`)
+		return err
+	}
+	_, err := s.db.Exec(`DELETE FROM history WHERE username = ?`, username)
+	return err
 }
 
 // --- Shares --------------------------------------------------------------
