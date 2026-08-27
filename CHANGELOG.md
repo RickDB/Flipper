@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Share access can now grant individual users permission to permanently
+  delete files and folders, with server-side authorization and path checks.
+- The shared-folder ZIP download action now uses a compact listing footer
+  instead of an oversized pill button.
 - SABnzbd uploads now use the Spotweb release title instead of the Spotnet
   message ID, while preserving spaces in the displayed release name.
 - Release names in recent history now link to their submitted Spotweb URL.

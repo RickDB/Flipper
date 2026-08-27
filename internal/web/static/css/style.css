@@ -346,6 +346,21 @@ code { background: #eef6f8; padding: 0.1em 0.4em; border-radius: 5px; font-size:
 .share-row .meta { font-size: 0.76rem; color: var(--ink-soft); white-space: nowrap; }
 .share-row .dl { color: var(--ocean2); text-decoration: none; font-size: 0.8rem; font-weight: 700; white-space: nowrap; cursor: pointer; }
 .share-row .dl:hover { text-decoration: underline; }
+.share-row .dl.delete { color: var(--danger); }
+.share-folder-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0.55rem 0.8rem;
+  border-top: 1px solid #eef6f8;
+  background: #f7fbfc;
+}
+.share-folder-download {
+  color: var(--ocean2);
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+.share-folder-download:hover { text-decoration: underline; }
 
 .pager { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 1rem; }
 .pager-page {

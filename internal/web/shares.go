@@ -68,11 +68,31 @@ func (s *Server) handleAdminShareUsers(w http.ResponseWriter, r *http.Request, s
 			ids = append(ids, n)
 		}
 	}
-	if err := s.store.SetShareAllowedUsers(id, ids); err != nil {
+	rawDelete := r.Form["delete_user_ids"]
+	deleteIDs := make([]int, 0, len(rawDelete))
+	for _, v := range rawDelete {
+		n, err := strconv.Atoi(v)
+		if err == nil {
+			deleteIDs = append(deleteIDs, n)
+		}
+	}
+	if err := s.store.SetSharePermissions(id, ids, deleteIDs); err != nil {
 		redirectFlash(w, r, "/admin", false, "Could not update share access: "+err.Error())
 		return
 	}
 	redirectFlash(w, r, "/admin", true, "Share access updated")
+}
+
+func canDeleteFromShare(share store.Share, sess auth.Session) bool {
+	if sess.IsAdmin {
+		return true
+	}
+	for _, uid := range share.DeleteUserIDs {
+		if uid == sess.UserID {
+			return true
+		}
+	}
+	return false
 }
 
 // --- user-facing: browse / download ---------------------------------------
@@ -180,7 +200,35 @@ func (s *Server) handleShareBrowse(w http.ResponseWriter, r *http.Request, sess 
 		"path":        rel,
 		"breadcrumbs": breadcrumbsFor(rel),
 		"entries":     out,
+		"canDelete":   canDeleteFromShare(share, sess),
 	})
+}
+
+func (s *Server) handleShareItemDelete(w http.ResponseWriter, r *http.Request, sess auth.Session) {
+	share, ok := s.authorizedShare(r, sess)
+	if !ok || !canDeleteFromShare(share, sess) {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	rel := cleanRelPath(r.URL.Query().Get("path"))
+	if rel == "" {
+		http.Error(w, "the share root cannot be deleted", http.StatusBadRequest)
+		return
+	}
+	abs, err := browse.ResolvePath(share.Path, rel)
+	if err != nil {
+		http.Error(w, "invalid path", http.StatusBadRequest)
+		return
+	}
+	if _, err := os.Lstat(abs); err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	if err := os.RemoveAll(abs); err != nil {
+		http.Error(w, "could not delete item: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, map[string]any{"ok": true})
 }
 
 func (s *Server) handleShareDownload(w http.ResponseWriter, r *http.Request, sess auth.Session) {

@@ -78,6 +78,7 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("GET /shares/{id}/browse", s.requireAuth(s.handleShareBrowse))
 	mux.HandleFunc("GET /shares/{id}/download", s.requireAuth(s.handleShareDownload))
 	mux.HandleFunc("GET /shares/{id}/zip", s.requireAuth(s.handleShareZip))
+	mux.HandleFunc("POST /shares/{id}/delete", s.requireAuth(s.handleShareItemDelete))
 
 	return s.withLogging(mux)
 }

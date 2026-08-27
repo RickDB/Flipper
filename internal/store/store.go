@@ -72,6 +72,7 @@ type Share struct {
 	Name           string
 	Path           string
 	AllowedUserIDs []int
+	DeleteUserIDs  []int
 	CreatedAt      time.Time
 }
 
@@ -125,6 +126,7 @@ CREATE TABLE IF NOT EXISTS shares (
 	name             TEXT NOT NULL,
 	path             TEXT NOT NULL,
 	allowed_user_ids TEXT NOT NULL DEFAULT '[]',
+	delete_user_ids  TEXT NOT NULL DEFAULT '[]',
 	created_at       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 `
@@ -193,6 +195,14 @@ func Open(path string) (*Store, error) {
 		if !strings.Contains(strings.ToLower(err.Error()), "duplicate column") {
 			db.Close()
 			return nil, fmt.Errorf("migrating history table: %w", err)
+		}
+	}
+
+	// Forward migration for per-user delete permissions on shared folders.
+	if _, err := db.Exec(`ALTER TABLE shares ADD COLUMN delete_user_ids TEXT NOT NULL DEFAULT '[]'`); err != nil {
+		if !strings.Contains(strings.ToLower(err.Error()), "duplicate column") {
+			db.Close()
+			return nil, fmt.Errorf("migrating shares table: %w", err)
 		}
 	}
 
@@ -431,15 +441,16 @@ func (s *Store) ListHistoryPage(offset, limit int) []HistoryItem {
 
 func scanShare(row interface{ Scan(...any) error }) (Share, error) {
 	var sh Share
-	var allowedJSON string
-	if err := row.Scan(&sh.ID, &sh.Name, &sh.Path, &allowedJSON, &sh.CreatedAt); err != nil {
+	var allowedJSON, deleteJSON string
+	if err := row.Scan(&sh.ID, &sh.Name, &sh.Path, &allowedJSON, &deleteJSON, &sh.CreatedAt); err != nil {
 		return Share{}, err
 	}
 	_ = json.Unmarshal([]byte(allowedJSON), &sh.AllowedUserIDs)
+	_ = json.Unmarshal([]byte(deleteJSON), &sh.DeleteUserIDs)
 	return sh, nil
 }
 
-const shareColumns = `id, name, path, allowed_user_ids, created_at`
+const shareColumns = `id, name, path, allowed_user_ids, delete_user_ids, created_at`
 
 // ListShares returns every share, admin's-eye view.
 func (s *Store) ListShares() []Share {
@@ -508,13 +519,28 @@ func (s *Store) DeleteShare(id int) error {
 	return err
 }
 
-// SetShareAllowedUsers replaces which user ids may browse a share.
-func (s *Store) SetShareAllowedUsers(id int, userIDs []int) error {
-	b, err := json.Marshal(userIDs)
+// SetSharePermissions replaces the access and delete grants for a share.
+// Delete permission is only retained for users who also have access.
+func (s *Store) SetSharePermissions(id int, userIDs, deleteUserIDs []int) error {
+	allowed := make(map[int]bool, len(userIDs))
+	for _, userID := range userIDs {
+		allowed[userID] = true
+	}
+	filteredDeleteIDs := make([]int, 0, len(deleteUserIDs))
+	for _, userID := range deleteUserIDs {
+		if allowed[userID] {
+			filteredDeleteIDs = append(filteredDeleteIDs, userID)
+		}
+	}
+	allowedJSON, err := json.Marshal(userIDs)
 	if err != nil {
 		return err
 	}
-	res, err := s.db.Exec(`UPDATE shares SET allowed_user_ids = ? WHERE id = ?`, string(b), id)
+	deleteJSON, err := json.Marshal(filteredDeleteIDs)
+	if err != nil {
+		return err
+	}
+	res, err := s.db.Exec(`UPDATE shares SET allowed_user_ids = ?, delete_user_ids = ? WHERE id = ?`, string(allowedJSON), string(deleteJSON), id)
 	if err != nil {
 		return err
 	}

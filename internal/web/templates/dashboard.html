@@ -147,10 +147,6 @@
       });
 
       var entries = data.entries || [];
-      if (!entries.length) {
-        listingEl.innerHTML = '<div class="empty-state">This folder is empty.</div>';
-        return;
-      }
       var rows = entries.map(function (e) {
         var icon = e.isDir ? '📁' : '📄';
         var meta = e.isDir ? '' : fmtSize(e.size);
@@ -158,10 +154,13 @@
         var actionHtml = e.isDir
           ? '<a class="dl" data-zip="' + encodeURIComponent(e.path) + '">⬇ zip</a>'
           : '<a class="dl" href="/shares/' + currentShareId + '/download?path=' + encodeURIComponent(e.path) + '">⬇ download</a>';
+        if (data.canDelete) {
+          actionHtml += ' <a class="dl delete" data-delete="' + encodeURIComponent(e.path) + '" data-name="' + encodeURIComponent(e.name) + '" data-isdir="' + e.isDir + '">🗑 delete</a>';
+        }
         return '<div class="share-row"><span class="icon">' + icon + '</span>' + nameHtml +
           '<span class="meta">' + meta + '</span>' + actionHtml + '</div>';
       });
-      listingEl.innerHTML = rows.join('');
+      listingEl.innerHTML = rows.length ? rows.join('') : '<div class="empty-state">This folder is empty.</div>';
 
       listingEl.querySelectorAll('.name.is-dir').forEach(function (el) {
         el.addEventListener('click', function () {
@@ -175,13 +174,26 @@
           window.location = '/shares/' + currentShareId + '/zip?path=' + encodeURIComponent(p);
         });
       });
+      listingEl.querySelectorAll('a.dl[data-delete]').forEach(function (el) {
+        el.addEventListener('click', function () {
+          var p = decodeURIComponent(el.getAttribute('data-delete'));
+          var name = decodeURIComponent(el.getAttribute('data-name'));
+          var kind = el.getAttribute('data-isdir') === 'true' ? 'folder and everything inside it' : 'file';
+          if (!confirm('Permanently delete the ' + kind + ' "' + name + '"?')) return;
+          fetch('/shares/' + currentShareId + '/delete?path=' + encodeURIComponent(p), {method: 'POST'})
+            .then(function (r) {
+              if (!r.ok) return r.text().then(function (message) { throw new Error(message.trim()); });
+              load();
+            })
+            .catch(function (err) { alert(err.message || 'Could not delete that item.'); });
+        });
+      });
 
       var actionsRow = document.createElement('div');
-      actionsRow.className = 'actions-row';
-      actionsRow.style.marginTop = '0.7rem';
+      actionsRow.className = 'share-folder-actions';
       var zipBtn = document.createElement('a');
-      zipBtn.className = 'btn btn-secondary btn-sm';
-      zipBtn.textContent = '⬇ Download this folder as .zip';
+      zipBtn.className = 'share-folder-download';
+      zipBtn.textContent = '⬇ Download folder as ZIP';
       zipBtn.href = '/shares/' + currentShareId + '/zip?path=' + encodeURIComponent(currentPath);
       actionsRow.appendChild(zipBtn);
       listingEl.appendChild(actionsRow);

@@ -236,15 +236,22 @@
       </form>
     </div>
     {{if $.NonAdminUsers}}
-    <form method="post" action="/admin/shares/{{.ID}}/users">
-      <label style="margin-top:0.7rem;">Users allowed to access this share</label>
+    <form class="share-permissions" method="post" action="/admin/shares/{{.ID}}/users">
+      <label style="margin-top:0.7rem;">User permissions</label>
       <div class="checkbox-grid">
         {{$allowed := .AllowedUserIDs}}
+        {{$deleteAllowed := .DeleteUserIDs}}
         {{range $.NonAdminUsers}}
-        <label class="chip-check {{if inIntSlice .ID $allowed}}checked{{end}}">
-          <input type="checkbox" name="user_ids" value="{{.ID}}" {{if inIntSlice .ID $allowed}}checked{{end}}>
-          {{.Username}}
-        </label>
+        <div>
+          <label class="chip-check {{if inIntSlice .ID $allowed}}checked{{end}}">
+            <input type="checkbox" name="user_ids" value="{{.ID}}" data-role="access" data-user="{{.ID}}" {{if inIntSlice .ID $allowed}}checked{{end}}>
+            {{.Username}}: access
+          </label>
+          <label class="chip-check {{if inIntSlice .ID $deleteAllowed}}checked{{end}}" style="margin-top:0.3rem;">
+            <input type="checkbox" name="delete_user_ids" value="{{.ID}}" data-role="delete" data-user="{{.ID}}" {{if inIntSlice .ID $deleteAllowed}}checked{{end}}>
+            {{.Username}}: delete files/folders
+          </label>
+        </div>
         {{end}}
       </div>
       <div class="actions-row">
@@ -282,6 +289,27 @@
     </div>
   </form>
 </div>
+
+<script>
+document.querySelectorAll('.share-permissions').forEach(function (form) {
+  form.querySelectorAll('input[type=checkbox]').forEach(function (cb) {
+    cb.addEventListener('change', function () {
+      cb.closest('.chip-check').classList.toggle('checked', cb.checked);
+      var user = cb.getAttribute('data-user');
+      if (cb.getAttribute('data-role') === 'delete' && cb.checked) {
+        var access = form.querySelector('input[data-role="access"][data-user="' + user + '"]');
+        access.checked = true;
+        access.closest('.chip-check').classList.add('checked');
+      }
+      if (cb.getAttribute('data-role') === 'access' && !cb.checked) {
+        var del = form.querySelector('input[data-role="delete"][data-user="' + user + '"]');
+        del.checked = false;
+        del.closest('.chip-check').classList.remove('checked');
+      }
+    });
+  });
+});
+</script>
 
 {{template "app_footer" .}}
 {{end}}
