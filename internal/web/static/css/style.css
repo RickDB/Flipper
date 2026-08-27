@@ -344,13 +344,29 @@ code { background: #eef6f8; padding: 0.1em 0.4em; border-radius: 5px; font-size:
 .share-row .name.is-dir { font-weight: 600; cursor: pointer; }
 .share-row .name.is-dir:hover { color: var(--ocean2); }
 .share-row .meta { font-size: 0.76rem; color: var(--ink-soft); white-space: nowrap; }
-.share-row .dl { color: var(--ocean2); text-decoration: none; font-size: 0.8rem; font-weight: 700; white-space: nowrap; cursor: pointer; }
+.share-row .dl {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.5rem;
+  color: var(--ocean2);
+  text-decoration: none;
+  font-size: 0.8rem;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+}
 .share-row .dl:hover { text-decoration: underline; }
-.share-row .dl.delete { color: var(--danger); }
+.share-row .dl.delete {
+  color: var(--danger);
+  margin-left: 0.35rem;
+  padding-left: 0.8rem;
+  border-left: 1px solid #f1ccd0;
+}
 .share-folder-actions {
   display: flex;
-  justify-content: flex-end;
-  padding: 0.55rem 0.8rem;
+  justify-content: flex-start;
+  padding: 0.55rem 0.8rem 0.55rem calc(0.8rem + 1.05em + 0.6rem);
   border-top: 1px solid #eef6f8;
   background: #f7fbfc;
 }

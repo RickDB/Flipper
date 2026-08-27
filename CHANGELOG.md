@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Improved shared-folder action alignment and spacing, with a stronger
+  irreversible-delete warning to help prevent accidental removal.
 - Share access can now grant individual users permission to permanently
   delete files and folders, with server-side authorization and path checks.
 - The shared-folder ZIP download action now uses a compact listing footer

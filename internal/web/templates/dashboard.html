@@ -178,8 +178,11 @@
         el.addEventListener('click', function () {
           var p = decodeURIComponent(el.getAttribute('data-delete'));
           var name = decodeURIComponent(el.getAttribute('data-name'));
-          var kind = el.getAttribute('data-isdir') === 'true' ? 'folder and everything inside it' : 'file';
-          if (!confirm('Permanently delete the ' + kind + ' "' + name + '"?')) return;
+          var isDir = el.getAttribute('data-isdir') === 'true';
+          var warning = isDir
+            ? 'Permanently delete the folder "' + name + '" and everything inside it?'
+            : 'Permanently delete the file "' + name + '"?';
+          if (!confirm(warning + '\n\nThis cannot be undone.')) return;
           fetch('/shares/' + currentShareId + '/delete?path=' + encodeURIComponent(p), {method: 'POST'})
             .then(function (r) {
               if (!r.ok) return r.text().then(function (message) { throw new Error(message.trim()); });

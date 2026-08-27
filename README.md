@@ -164,4 +164,4 @@ self-signed certs. Leave it unchecked unless you need it.
 
 ## Version
 
-Current version: **0.03**
+Current version: **0.04**
