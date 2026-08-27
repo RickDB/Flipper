@@ -99,6 +99,18 @@ body {
   margin: 0 auto;
   padding: 0.5rem clamp(1rem, 4vw, 2.5rem) 3rem;
 }
+.main-wrap-wide { max-width: 1320px; }
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr;
+  gap: 1.5rem;
+  align-items: start;
+}
+@media (max-width: 900px) {
+  .dashboard-grid { grid-template-columns: 1fr; }
+}
+.dashboard-col { min-width: 0; }
 
 .card {
   background: var(--card-bg);
@@ -334,6 +346,25 @@ code { background: #eef6f8; padding: 0.1em 0.4em; border-radius: 5px; font-size:
 .share-row .meta { font-size: 0.76rem; color: var(--ink-soft); white-space: nowrap; }
 .share-row .dl { color: var(--ocean2); text-decoration: none; font-size: 0.8rem; font-weight: 700; white-space: nowrap; cursor: pointer; }
 .share-row .dl:hover { text-decoration: underline; }
+
+.pager { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 1rem; }
+.pager-page {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2rem;
+  height: 2rem;
+  padding: 0 0.5rem;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-decoration: none;
+  color: var(--deep);
+  background: #eef6f8;
+  border: 1.5px solid #d7e8ee;
+}
+.pager-page:hover { border-color: var(--teal); }
+.pager-page.active { background: linear-gradient(135deg, var(--teal), var(--ocean2)); color: #fff; border-color: transparent; }
 
 .share-admin-item { padding: 0.4rem 0; }
 .share-admin-head {

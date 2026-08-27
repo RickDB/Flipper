@@ -1,6 +1,9 @@
 {{define "dashboard_page"}}
 {{template "app_header" .}}
 
+<div class="dashboard-grid">
+<div class="dashboard-col">
+
 <div class="card">
   <h2><span class="emoji-icon">🌊</span> Send a release to SABnzbd</h2>
   <div class="card-sub">Paste a Spotweb spot link, pick a category, and Flipper will fetch the NZB and hand it to SABnzbd.</div>
@@ -26,7 +29,9 @@
 
 <div class="card">
   <h2><span class="emoji-icon">📜</span> Recent history</h2>
-  <div class="card-sub">Last {{len .History}} of up to 10 items.</div>
+  <div class="card-sub">
+    {{if .HistoryTotal}}Showing {{len .History}} of {{.HistoryTotal}} (page {{.HistoryPage}} of {{.HistoryTotalPages}}) &mdash; up to 100 kept.{{else}}Nothing sent yet.{{end}}
+  </div>
   {{if .History}}
   <div style="overflow-x:auto;">
   <table>
@@ -45,10 +50,24 @@
     </tbody>
   </table>
   </div>
+  {{if gt .HistoryTotalPages 1}}
+  <div class="pager">
+    {{range .HistoryPages}}
+      {{if eq . $.HistoryPage}}
+      <span class="pager-page active">{{.}}</span>
+      {{else}}
+      <a class="pager-page" href="/?hpage={{.}}">{{.}}</a>
+      {{end}}
+    {{end}}
+  </div>
+  {{end}}
   {{else}}
   <div class="empty-state">Nothing sent yet — items you send will show up here.</div>
   {{end}}
 </div>
+
+</div>
+<div class="dashboard-col">
 
 <div class="card">
   <h2><span class="emoji-icon">📁</span> Shared folders</h2>
@@ -64,6 +83,9 @@
   {{else}}
   <div class="empty-state">No shared folders yet — ask an admin to share one with you.</div>
   {{end}}
+</div>
+
+</div>
 </div>
 
 <script>

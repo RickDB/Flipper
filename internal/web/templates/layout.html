@@ -63,7 +63,7 @@
     {{end}}
   </nav>
 </header>
-<main class="main-wrap">
+<main class="main-wrap{{if .WideLayout}} main-wrap-wide{{end}}">
   {{if .Flash}}<div class="flash {{if .Flash.OK}}ok{{else}}fail{{end}}">{{.Flash.Message}}</div>{{end}}
 {{end}}
 

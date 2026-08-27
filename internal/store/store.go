@@ -16,7 +16,7 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-const maxHistory = 10
+const maxHistory = 100
 
 type User struct {
 	ID            int
@@ -395,9 +395,21 @@ func (s *Store) AddHistory(item HistoryItem) error {
 	return tx.Commit()
 }
 
-func (s *Store) ListHistory() []HistoryItem {
+// CountHistory returns the total number of kept history rows (up to
+// maxHistory), for computing pagination.
+func (s *Store) CountHistory() int {
+	var n int
+	if err := s.db.QueryRow(`SELECT COUNT(*) FROM history`).Scan(&n); err != nil {
+		return 0
+	}
+	return n
+}
+
+// ListHistoryPage returns up to limit history rows, most recent first,
+// starting after the given offset.
+func (s *Store) ListHistoryPage(offset, limit int) []HistoryItem {
 	rows, err := s.db.Query(`SELECT id, timestamp, username, spot_url, message_id, title, category, success, message
-		FROM history ORDER BY timestamp DESC LIMIT ?`, maxHistory)
+		FROM history ORDER BY timestamp DESC LIMIT ? OFFSET ?`, limit, offset)
 	if err != nil {
 		return nil
 	}

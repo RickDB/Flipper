@@ -90,9 +90,10 @@ type Flash struct {
 }
 
 type Base struct {
-	Version string
-	User    *auth.Session
-	Flash   *Flash
+	Version    string
+	User       *auth.Session
+	Flash      *Flash
+	WideLayout bool // widens the main content column; set by pages with a side-by-side layout
 }
 
 func (s *Server) base(sess *auth.Session, r *http.Request) Base {
@@ -303,23 +304,53 @@ func (s *Server) handleSetupSubmit(w http.ResponseWriter, r *http.Request) {
 
 // --- dashboard / submit --------------------------------------------------
 
+const historyPageSize = 10
+
 type dashboardData struct {
 	Base
-	Categories      []string
-	DefaultCategory string
-	History         []store.HistoryItem
-	PrefillURL      string
-	Shares          []store.Share
+	Categories        []string
+	DefaultCategory   string
+	History           []store.HistoryItem
+	PrefillURL        string
+	Shares            []store.Share
+	HistoryTotal      int
+	HistoryPage       int
+	HistoryTotalPages int
+	HistoryPages      []int
 }
 
 func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request, sess auth.Session) {
 	settings := s.store.GetSettings()
+
+	total := s.store.CountHistory()
+	totalPages := (total + historyPageSize - 1) / historyPageSize
+	if totalPages < 1 {
+		totalPages = 1
+	}
+	page := 1
+	if p, err := strconv.Atoi(r.URL.Query().Get("hpage")); err == nil && p > 0 {
+		page = p
+	}
+	if page > totalPages {
+		page = totalPages
+	}
+	pages := make([]int, totalPages)
+	for i := range pages {
+		pages[i] = i + 1
+	}
+
+	base := s.base(&sess, r)
+	base.WideLayout = true
 	data := dashboardData{
-		Base:            s.base(&sess, r),
-		Categories:      settings.AllowedCategories,
-		DefaultCategory: settings.DefaultCategory,
-		History:         s.store.ListHistory(),
-		Shares:          s.store.ListSharesForUser(sess.UserID, sess.IsAdmin),
+		Base:              base,
+		Categories:        settings.AllowedCategories,
+		DefaultCategory:   settings.DefaultCategory,
+		History:           s.store.ListHistoryPage((page-1)*historyPageSize, historyPageSize),
+		Shares:            s.store.ListSharesForUser(sess.UserID, sess.IsAdmin),
+		HistoryTotal:      total,
+		HistoryPage:       page,
+		HistoryTotalPages: totalPages,
+		HistoryPages:      pages,
 	}
 	s.render(w, "dashboard_page", data)
 }

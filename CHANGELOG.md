@@ -14,6 +14,10 @@
   manually customized template is left alone).
 - Send confirmations and history now show the real Spotweb release title
   (fetched via `t=details`) instead of SABnzbd's internal job ID.
+- Recent history now keeps up to 100 items (was 10), paginated 10 per page.
+- Dashboard is now a two-column layout: "Send a release" and "Recent
+  history" on the left, "Shared folders" on the right, so the shares
+  browser no longer pushes the page into a long vertical scroll.
 - New: admin-managed local folder shares. Admins name and assign folders to
   specific users; assigned users get an inline browser on the dashboard
   (breadcrumbs, file downloads, whole-folder zip downloads, auto-refresh)
