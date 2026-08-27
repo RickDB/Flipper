@@ -1,0 +1,34 @@
+{{define "account_page"}}
+{{template "app_header" .}}
+
+<div class="card">
+  <h2><span class="emoji-icon">🐬</span> Your Spotweb API key</h2>
+  <div class="card-sub">Optional — if you don't set one, your admin's fallback key (if configured) is used instead.</div>
+  <form method="post" action="/account/spotweb-key">
+    <label for="spotweb_api_key">Spotweb API key</label>
+    <input id="spotweb_api_key" type="text" name="spotweb_api_key" autocomplete="off" placeholder="Your personal Spotweb API key" value="{{.SpotwebAPIKey}}">
+    <div class="field-hint">Find this in Spotweb itself, under your own profile / account settings ("Gebruiker wijzigen"). Using your own key (rather than a shared admin key) means downloads count against your own Spotweb account.</div>
+    <div class="actions-row">
+      <button type="submit" class="btn btn-primary">Save API key</button>
+    </div>
+  </form>
+</div>
+
+<div class="card">
+  <h2><span class="emoji-icon">🔑</span> Your account</h2>
+  <div class="card-sub">Signed in as <strong>{{.User.Username}}</strong>{{if .User.IsAdmin}} (admin){{end}}.</div>
+  <form method="post" action="/account">
+    <label for="current">Current password</label>
+    <input id="current" type="password" name="current_password" autocomplete="current-password" required>
+    <label for="new">New password</label>
+    <input id="new" type="password" name="new_password" autocomplete="new-password" minlength="8" required>
+    <label for="confirm">Confirm new password</label>
+    <input id="confirm" type="password" name="confirm_password" autocomplete="new-password" minlength="8" required>
+    <div class="actions-row">
+      <button type="submit" class="btn btn-primary">Update password</button>
+    </div>
+  </form>
+</div>
+
+{{template "app_footer" .}}
+{{end}}

@@ -1,0 +1,287 @@
+{{define "admin_page"}}
+{{template "app_header" .}}
+
+<div class="card">
+  <h2><span class="emoji-icon">📡</span> SABnzbd connection</h2>
+  <div class="card-sub">Flipper fetches the release NZB itself and hands it to SABnzbd, so SABnzbd never needs to reach Spotweb directly.</div>
+  <form id="sabnzbd-form" method="post" action="/admin/sabnzbd/save">
+    <div class="grid-2">
+      <div>
+        <label for="sab_url">SABnzbd base URL</label>
+        <input id="sab_url" type="text" name="url" placeholder="http://192.168.1.10:8080/sabnzbd" value="{{.Settings.SabnzbdURL}}" required>
+        <div class="field-hint">No trailing slash needed. Include any subpath (e.g. <code>/sabnzbd</code>) if your instance uses one.</div>
+      </div>
+      <div>
+        <label for="sab_key">API key</label>
+        <input id="sab_key" type="text" name="apikey" placeholder="SABnzbd API key" value="{{.Settings.SabnzbdAPIKey}}" autocomplete="off" required>
+        <div class="field-hint">Config &rarr; General &rarr; API Key in SABnzbd.</div>
+      </div>
+    </div>
+    <div class="checkbox-row">
+      <input type="checkbox" id="sab_skip" name="skip_verify" {{if .Settings.SabnzbdSkipVerify}}checked{{end}}>
+      <label for="sab_skip">Skip TLS certificate verification (self-signed certs)</label>
+    </div>
+
+    <hr class="section-divider">
+
+    <label>Allowed categories <span style="font-weight:400;color:var(--ink-soft);">(shown to regular users)</span></label>
+    <div id="cat-checkboxes" class="checkbox-grid">
+      {{range .DisplayCategories}}
+      <label class="chip-check {{if isAllowed . $.Settings.AllowedCategories}}checked{{end}}">
+        <input type="checkbox" name="allowed_categories" value="{{.}}" {{if isAllowed . $.Settings.AllowedCategories}}checked{{end}}>
+        {{.}}
+      </label>
+      {{end}}
+      {{if not .DisplayCategories}}<div class="empty-state">No categories yet — save your URL/API key, then click "Refresh categories".</div>{{end}}
+    </div>
+
+    <label for="sab_default">Default category</label>
+    <select id="sab_default" name="default_category">
+      <option value="">(none)</option>
+      {{range .DisplayCategories}}<option value="{{.}}" {{if eq . $.Settings.DefaultCategory}}selected{{end}}>{{.}}</option>{{end}}
+    </select>
+
+    {{if .CategoryFetchError}}<div class="test-result show fail">{{.CategoryFetchError}}</div>{{end}}
+
+    <div class="actions-row">
+      <button type="button" class="btn btn-secondary" id="sab-test-btn">🔎 Test connection</button>
+      <button type="button" class="btn btn-secondary" id="sab-refresh-btn">🔄 Refresh categories</button>
+      <button type="submit" class="btn btn-primary">💾 Save SABnzbd settings</button>
+    </div>
+    <div class="test-result" id="sab-test-result"></div>
+  </form>
+</div>
+
+<div class="card">
+  <h2><span class="emoji-icon">🐬</span> Spotweb connection</h2>
+  <div class="card-sub">Used to fetch the NZB behind a pasted spot link.</div>
+  <form id="spotweb-form" method="post" action="/admin/spotweb/save">
+    <label for="spot_url">Spotweb base URL</label>
+    <input id="spot_url" type="text" name="url" placeholder="https://spotweb.example.com" value="{{.Settings.SpotwebURL}}" required>
+
+    <label for="spot_apikey">Fallback Spotweb API key <span style="font-weight:400;color:var(--ink-soft);">(admin-level, optional)</span></label>
+    <input id="spot_apikey" type="text" name="apikey" value="{{.Settings.SpotwebAPIKey}}" autocomplete="off" placeholder="Used when a user hasn't set their own personal key">
+    <div class="field-hint">
+      Found in Spotweb under your own profile / account settings ("Gebruiker wijzigen"). Users can set their own personal key on their
+      Account page, which takes priority over this one — set this so Flipper works before anyone has done that.
+    </div>
+
+    <label for="spot_tpl">NZB download URL template</label>
+    <input id="spot_tpl" type="text" name="nzb_template" value="{{.Settings.SpotwebNZBTemplate}}" required>
+    <div class="field-hint">
+      <code>{base}</code>, <code>{messageid}</code> and <code>{apikey}</code> are substituted. The default uses Spotweb's built-in
+      Newznab-compatible API (<code>{base}/api?t=get&amp;id={messageid}&amp;apikey={apikey}</code>) — the same mechanism tools like
+      Sonarr/NZBHydra use, no session login required. Only change this if your instance is customized.
+    </div>
+
+    <hr class="section-divider">
+
+    <label>Reverse-proxy HTTP basic auth <span style="font-weight:400;color:var(--ink-soft);">(optional, rarely needed)</span></label>
+    <div class="field-hint">Only fill these in if something sits in front of Spotweb itself (e.g. an nginx/Cloudflare Access layer) that requires HTTP basic auth. This is separate from — and not a substitute for — the Spotweb API key above.</div>
+    <div class="grid-2">
+      <div>
+        <input id="spot_user" type="text" name="username" placeholder="Basic auth username" value="{{.Settings.SpotwebUsername}}" autocomplete="off">
+      </div>
+      <div>
+        <input id="spot_pass" type="password" name="password" placeholder="Basic auth password" value="{{.Settings.SpotwebPassword}}" autocomplete="off">
+      </div>
+    </div>
+
+    <div class="checkbox-row">
+      <input type="checkbox" id="spot_skip" name="skip_verify" {{if .Settings.SpotwebSkipVerify}}checked{{end}}>
+      <label for="spot_skip">Skip TLS certificate verification (self-signed certs)</label>
+    </div>
+
+    <div class="actions-row">
+      <button type="button" class="btn btn-secondary" id="spot-test-btn">🔎 Test connection</button>
+      <button type="submit" class="btn btn-primary">💾 Save Spotweb settings</button>
+    </div>
+    <div class="test-result" id="spot-test-result"></div>
+  </form>
+</div>
+
+<div class="card">
+  <h2><span class="emoji-icon">👥</span> Users</h2>
+  <div class="card-sub">There is a single admin account ({{.AdminUsername}}). Everyone else is a regular user who can submit releases.</div>
+
+  {{if .Users}}
+  <table>
+    <thead><tr><th>Username</th><th>Role</th><th>Created</th><th></th></tr></thead>
+    <tbody>
+    {{range .Users}}
+      <tr>
+        <td>{{.Username}}</td>
+        <td>{{if .IsAdmin}}<span class="badge badge-admin">Admin</span>{{else}}User{{end}}</td>
+        <td>{{fmtTime .CreatedAt}}</td>
+        <td>
+          {{if not .IsAdmin}}
+          <form method="post" action="/admin/users/{{.ID}}/delete" onsubmit="return confirm('Remove user {{.Username}}?');" style="margin:0;">
+            <button type="submit" class="btn btn-danger btn-sm">Remove</button>
+          </form>
+          {{end}}
+        </td>
+      </tr>
+    {{end}}
+    </tbody>
+  </table>
+  {{end}}
+
+  <hr class="section-divider">
+
+  <label>Add a user</label>
+  <form method="post" action="/admin/users">
+    <div class="grid-2">
+      <div>
+        <input type="text" name="username" placeholder="Username" required>
+      </div>
+      <div>
+        <input type="password" name="password" placeholder="Password (min 8 characters)" minlength="8" required>
+      </div>
+    </div>
+    <div class="actions-row">
+      <button type="submit" class="btn btn-primary">➕ Add user</button>
+    </div>
+  </form>
+</div>
+
+<script>
+(function () {
+  function serialize(form) {
+    return new URLSearchParams(new FormData(form)).toString();
+  }
+  function showResult(el, ok, message) {
+    el.className = 'test-result show ' + (ok ? 'ok' : 'fail');
+    el.textContent = message;
+  }
+
+  var sabForm = document.getElementById('sabnzbd-form');
+  var sabResult = document.getElementById('sab-test-result');
+  document.getElementById('sab-test-btn').addEventListener('click', function () {
+    showResult(sabResult, true, 'Testing…');
+    fetch('/admin/sabnzbd/test', { method: 'POST', headers: {'Content-Type':'application/x-www-form-urlencoded'}, body: serialize(sabForm) })
+      .then(function (r) { return r.json(); })
+      .then(function (data) { showResult(sabResult, data.ok, data.message); })
+      .catch(function () { showResult(sabResult, false, 'Request failed.'); });
+  });
+
+  document.getElementById('sab-refresh-btn').addEventListener('click', function () {
+    var grid = document.getElementById('cat-checkboxes');
+    showResult(sabResult, true, 'Fetching categories…');
+    fetch('/admin/sabnzbd/categories', { method: 'POST', headers: {'Content-Type':'application/x-www-form-urlencoded'}, body: serialize(sabForm) })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (!data.ok) { showResult(sabResult, false, data.message); return; }
+        var checked = {};
+        grid.querySelectorAll('input[type=checkbox]:checked').forEach(function (cb) { checked[cb.value] = true; });
+        grid.innerHTML = '';
+        var defaultSel = document.getElementById('sab_default');
+        var prevDefault = defaultSel.value;
+        defaultSel.innerHTML = '<option value="">(none)</option>';
+        (data.categories || []).forEach(function (cat) {
+          var label = document.createElement('label');
+          label.className = 'chip-check' + (checked[cat] ? ' checked' : '');
+          var cb = document.createElement('input');
+          cb.type = 'checkbox'; cb.name = 'allowed_categories'; cb.value = cat;
+          cb.checked = !!checked[cat];
+          cb.addEventListener('change', function () { label.classList.toggle('checked', cb.checked); });
+          label.appendChild(cb);
+          label.appendChild(document.createTextNode(' ' + cat));
+          grid.appendChild(label);
+
+          var opt = document.createElement('option');
+          opt.value = cat; opt.textContent = cat;
+          if (cat === prevDefault) opt.selected = true;
+          defaultSel.appendChild(opt);
+        });
+        showResult(sabResult, true, 'Found ' + (data.categories || []).length + ' categories. Click "Save SABnzbd settings" to keep your selection.');
+      })
+      .catch(function () { showResult(sabResult, false, 'Request failed.'); });
+  });
+
+  document.querySelectorAll('#cat-checkboxes .chip-check').forEach(function (label) {
+    var cb = label.querySelector('input');
+    if (cb) cb.addEventListener('change', function () { label.classList.toggle('checked', cb.checked); });
+  });
+
+  var spotForm = document.getElementById('spotweb-form');
+  var spotResult = document.getElementById('spot-test-result');
+  document.getElementById('spot-test-btn').addEventListener('click', function () {
+    showResult(spotResult, true, 'Testing…');
+    fetch('/admin/spotweb/test', { method: 'POST', headers: {'Content-Type':'application/x-www-form-urlencoded'}, body: serialize(spotForm) })
+      .then(function (r) { return r.json(); })
+      .then(function (data) { showResult(spotResult, data.ok, data.message); })
+      .catch(function () { showResult(spotResult, false, 'Request failed.'); });
+  });
+})();
+</script>
+
+<div class="card">
+  <h2><span class="emoji-icon">📁</span> Local folder shares</h2>
+  <div class="card-sub">
+    Share local folders on this server with specific users. They can browse, download individual files, and download
+    whole folders as a zip — right from their dashboard. The name shown to users is chosen by you and never reveals
+    the real folder path.
+  </div>
+
+  {{if .Shares}}
+  {{range .Shares}}
+  <div class="share-admin-item">
+    <div class="share-admin-head">
+      <div>
+        <strong>{{.Name}}</strong>
+        <div class="field-hint" style="margin-top:0.15rem;"><code>{{.Path}}</code></div>
+      </div>
+      <form method="post" action="/admin/shares/{{.ID}}/delete" onsubmit="return confirm('Remove share &quot;{{.Name}}&quot;? This only removes the share — no files are touched.');" style="margin:0;">
+        <button type="submit" class="btn btn-danger btn-sm">Remove</button>
+      </form>
+    </div>
+    {{if $.NonAdminUsers}}
+    <form method="post" action="/admin/shares/{{.ID}}/users">
+      <label style="margin-top:0.7rem;">Users allowed to access this share</label>
+      <div class="checkbox-grid">
+        {{$allowed := .AllowedUserIDs}}
+        {{range $.NonAdminUsers}}
+        <label class="chip-check {{if inIntSlice .ID $allowed}}checked{{end}}">
+          <input type="checkbox" name="user_ids" value="{{.ID}}" {{if inIntSlice .ID $allowed}}checked{{end}}>
+          {{.Username}}
+        </label>
+        {{end}}
+      </div>
+      <div class="actions-row">
+        <button type="submit" class="btn btn-secondary btn-sm">💾 Save access</button>
+      </div>
+    </form>
+    {{else}}
+    <div class="field-hint" style="margin-top:0.6rem;">Add a regular user below to be able to grant them access to this share. As admin, you can always see every share.</div>
+    {{end}}
+  </div>
+  <hr class="section-divider">
+  {{end}}
+  {{else}}
+  <div class="empty-state">No shared folders yet.</div>
+  <hr class="section-divider">
+  {{end}}
+
+  <label>Add a shared folder</label>
+  <form method="post" action="/admin/shares">
+    <div class="grid-2">
+      <div>
+        <input type="text" name="name" placeholder="Display name (e.g. Movies)" required>
+      </div>
+      <div>
+        <input type="text" name="path" placeholder="Folder path, e.g. /data/movies" required>
+      </div>
+    </div>
+    <div class="field-hint">
+      The path must already exist and be readable by Flipper. Running under Docker? Bind-mount the folder into the
+      container first (see the commented example in <code>compose.yaml</code>), then use the path as it appears
+      <em>inside</em> the container here.
+    </div>
+    <div class="actions-row">
+      <button type="submit" class="btn btn-primary">➕ Add share</button>
+    </div>
+  </form>
+</div>
+
+{{template "app_footer" .}}
+{{end}}

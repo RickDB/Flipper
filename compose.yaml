@@ -1,0 +1,37 @@
+services:
+  flipper:
+    build:
+      context: .
+      args:
+        VERSION: ${FLIPPER_VERSION:-0.01}
+    image: ghcr.io/rickdb/flipper:latest
+    container_name: flipper
+    restart: unless-stopped
+    environment:
+      FLIPPER_LISTEN: "${FLIPPER_LISTEN:-:19012}"
+      FLIPPER_DB: "${FLIPPER_DB:-/app/data/flipper.db}"
+      # Only used to bootstrap the admin account on first boot, when no
+      # admin exists yet. After that, manage users from the Admin panel.
+      FLIPPER_INITIAL_USERNAME: ${FLIPPER_INITIAL_USERNAME:-admin}
+      FLIPPER_INITIAL_PASSWORD: ${FLIPPER_INITIAL_PASSWORD:?FLIPPER_INITIAL_PASSWORD must be set in .env}
+    ports:
+      - "${FLIPPER_PORT:-19012}:19012"
+    volumes:
+      # Set FLIPPER_DATA_PATH to a relative or absolute host folder holding
+      # the SQLite database. A named volume is the fallback if unset.
+      - ${FLIPPER_DATA_PATH:-flipper-data}:/app/data
+      # To use the "local folder shares" feature (Admin -> Local folder
+      # shares), bind-mount any host folder you want to share in here, then
+      # add it as a share in the Admin panel using its path *inside the
+      # container* (the right-hand side below), e.g.:
+      # - /mnt/media/movies:/shares/movies:ro
+      # - /mnt/media/tv:/shares/tv:ro
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://127.0.0.1:19012/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  flipper-data:

@@ -1,0 +1,208 @@
+{{define "dashboard_page"}}
+{{template "app_header" .}}
+
+<div class="card">
+  <h2><span class="emoji-icon">🌊</span> Send a release to SABnzbd</h2>
+  <div class="card-sub">Paste a Spotweb spot link, pick a category, and Flipper will fetch the NZB and hand it to SABnzbd.</div>
+  <form method="post" action="/submit">
+    <label for="spot_url">Spotweb spot URL</label>
+    <input id="spot_url" type="text" name="spot_url" placeholder="https://spotweb.example.com/#/?page=getspot&amp;messageid=..." required value="{{.PrefillURL}}">
+    <div class="spot-preview" id="spot-preview"></div>
+
+    <label for="category">SABnzbd category</label>
+    {{if .Categories}}
+    <select id="category" name="category">
+      {{range .Categories}}<option value="{{.}}" {{if eq . $.DefaultCategory}}selected{{end}}>{{.}}</option>{{end}}
+    </select>
+    {{else}}
+    <div class="helper-block">No SABnzbd categories are configured yet. Ask an admin to set them up under Admin &rarr; SABnzbd.</div>
+    {{end}}
+
+    <div class="actions-row">
+      <button class="btn btn-primary" type="submit" {{if not .Categories}}disabled{{end}}>🐬 Send to SABnzbd</button>
+    </div>
+  </form>
+</div>
+
+<div class="card">
+  <h2><span class="emoji-icon">📜</span> Recent history</h2>
+  <div class="card-sub">Last {{len .History}} of up to 10 items.</div>
+  {{if .History}}
+  <div style="overflow-x:auto;">
+  <table>
+    <thead><tr><th>When</th><th>By</th><th>Category</th><th>Status</th><th>Detail</th></tr></thead>
+    <tbody>
+    {{range .History}}
+      <tr>
+        <td>{{fmtTime .Timestamp}}</td>
+        <td>{{.Username}}</td>
+        <td>{{.Category}}</td>
+        <td>{{if .Success}}<span class="badge badge-ok">Added</span>{{else}}<span class="badge badge-fail">Failed</span>{{end}}</td>
+        <td>{{.Message}}</td>
+      </tr>
+    {{end}}
+    </tbody>
+  </table>
+  </div>
+  {{else}}
+  <div class="empty-state">Nothing sent yet — items you send will show up here.</div>
+  {{end}}
+</div>
+
+<div class="card">
+  <h2><span class="emoji-icon">📁</span> Shared folders</h2>
+  <div class="card-sub">Browse and download files shared with you by the admin. New files show up automatically.</div>
+  {{if .Shares}}
+  <div class="share-tabs" id="share-tabs">
+    {{range $i, $sh := .Shares}}
+    <button type="button" class="chip-check share-tab" data-share-id="{{$sh.ID}}">📂 {{$sh.Name}}</button>
+    {{end}}
+  </div>
+  <div class="share-breadcrumbs" id="share-breadcrumbs"></div>
+  <div class="share-listing" id="share-listing"></div>
+  {{else}}
+  <div class="empty-state">No shared folders yet — ask an admin to share one with you.</div>
+  {{end}}
+</div>
+
+<script>
+(function () {
+  var tabsEl = document.getElementById('share-tabs');
+  if (tabsEl) {
+    var crumbsEl = document.getElementById('share-breadcrumbs');
+    var listingEl = document.getElementById('share-listing');
+    var currentShareId = null;
+    var currentPath = '';
+    var refreshTimer = null;
+
+    function fmtSize(n) {
+      if (n < 1024) return n + ' B';
+      var units = ['KiB', 'MiB', 'GiB', 'TiB'];
+      var v = n / 1024, i = 0;
+      while (v >= 1024 && i < units.length - 1) { v /= 1024; i++; }
+      return v.toFixed(1) + ' ' + units[i];
+    }
+
+    function selectShare(id) {
+      currentShareId = id;
+      currentPath = '';
+      tabsEl.querySelectorAll('.share-tab').forEach(function (b) {
+        b.classList.toggle('active', b.getAttribute('data-share-id') === String(id));
+      });
+      load();
+    }
+
+    function load() {
+      if (currentShareId == null) return;
+      fetch('/shares/' + currentShareId + '/browse?path=' + encodeURIComponent(currentPath))
+        .then(function (r) { return r.json(); })
+        .then(render)
+        .catch(function () {
+          listingEl.innerHTML = '<div class="empty-state">Could not reach the server to list this folder.</div>';
+        });
+    }
+
+    function render(data) {
+      if (!data.ok) {
+        crumbsEl.innerHTML = '';
+        listingEl.innerHTML = '<div class="empty-state">' + (data.message || 'Could not load this folder.') + '</div>';
+        return;
+      }
+      currentPath = data.path || '';
+
+      var crumbHtml = [];
+      (data.breadcrumbs || []).forEach(function (c, i) {
+        if (i > 0) crumbHtml.push('<span class="sep">/</span>');
+        crumbHtml.push('<a data-path="' + encodeURIComponent(c.path) + '">' + escapeHtml(c.name) + '</a>');
+      });
+      crumbsEl.innerHTML = crumbHtml.join('');
+      crumbsEl.querySelectorAll('a').forEach(function (a) {
+        a.addEventListener('click', function () {
+          currentPath = decodeURIComponent(a.getAttribute('data-path'));
+          load();
+        });
+      });
+
+      var entries = data.entries || [];
+      if (!entries.length) {
+        listingEl.innerHTML = '<div class="empty-state">This folder is empty.</div>';
+        return;
+      }
+      var rows = entries.map(function (e) {
+        var icon = e.isDir ? '📁' : '📄';
+        var meta = e.isDir ? '' : fmtSize(e.size);
+        var nameHtml = '<span class="name' + (e.isDir ? ' is-dir' : '') + '" data-path="' + encodeURIComponent(e.path) + '" data-isdir="' + e.isDir + '">' + escapeHtml(e.name) + '</span>';
+        var actionHtml = e.isDir
+          ? '<a class="dl" data-zip="' + encodeURIComponent(e.path) + '">⬇ zip</a>'
+          : '<a class="dl" href="/shares/' + currentShareId + '/download?path=' + encodeURIComponent(e.path) + '">⬇ download</a>';
+        return '<div class="share-row"><span class="icon">' + icon + '</span>' + nameHtml +
+          '<span class="meta">' + meta + '</span>' + actionHtml + '</div>';
+      });
+      listingEl.innerHTML = rows.join('');
+
+      listingEl.querySelectorAll('.name.is-dir').forEach(function (el) {
+        el.addEventListener('click', function () {
+          currentPath = decodeURIComponent(el.getAttribute('data-path'));
+          load();
+        });
+      });
+      listingEl.querySelectorAll('a.dl[data-zip]').forEach(function (el) {
+        el.addEventListener('click', function () {
+          var p = decodeURIComponent(el.getAttribute('data-zip'));
+          window.location = '/shares/' + currentShareId + '/zip?path=' + encodeURIComponent(p);
+        });
+      });
+
+      var actionsRow = document.createElement('div');
+      actionsRow.className = 'actions-row';
+      actionsRow.style.marginTop = '0.7rem';
+      var zipBtn = document.createElement('a');
+      zipBtn.className = 'btn btn-secondary btn-sm';
+      zipBtn.textContent = '⬇ Download this folder as .zip';
+      zipBtn.href = '/shares/' + currentShareId + '/zip?path=' + encodeURIComponent(currentPath);
+      actionsRow.appendChild(zipBtn);
+      listingEl.appendChild(actionsRow);
+    }
+
+    function escapeHtml(s) {
+      var d = document.createElement('div');
+      d.textContent = s;
+      return d.innerHTML;
+    }
+
+    tabsEl.querySelectorAll('.share-tab').forEach(function (btn) {
+      btn.addEventListener('click', function () { selectShare(btn.getAttribute('data-share-id')); });
+    });
+    var first = tabsEl.querySelector('.share-tab');
+    if (first) selectShare(first.getAttribute('data-share-id'));
+
+    // Lightweight auto-refresh: silently re-fetch the current folder every
+    // 15s so newly-added files show up without a manual reload.
+    refreshTimer = setInterval(load, 15000);
+    window.addEventListener('beforeunload', function () { clearInterval(refreshTimer); });
+  }
+})();
+
+(function () {
+  var input = document.getElementById('spot_url');
+  var preview = document.getElementById('spot-preview');
+  if (!input || !preview) return;
+  function update() {
+    var m = input.value.match(/messageid=([^&#]+)/);
+    if (m) {
+      try {
+        preview.textContent = 'Message ID: ' + decodeURIComponent(m[1]);
+      } catch (e) {
+        preview.textContent = 'Message ID: ' + m[1];
+      }
+    } else {
+      preview.textContent = '';
+    }
+  }
+  input.addEventListener('input', update);
+  update();
+})();
+</script>
+
+{{template "app_footer" .}}
+{{end}}

@@ -1,0 +1,15 @@
+{{define "login_page"}}
+{{template "auth_header" .}}
+<img class="logo" src="/static/img/dolphin-logo.svg" alt="Flipper logo">
+<h1>Flipper</h1>
+<div class="tagline">Spotweb &rarr; SABnzbd, made simple</div>
+{{if .Flash}}<div class="flash {{if .Flash.OK}}ok{{else}}fail{{end}}">{{.Flash.Message}}</div>{{end}}
+<form method="post" action="/login">
+  <label for="username">Username</label>
+  <input id="username" type="text" name="username" autocomplete="username" required autofocus>
+  <label for="password">Password</label>
+  <input id="password" type="password" name="password" autocomplete="current-password" required>
+  <button class="btn btn-primary btn-block" style="margin-top:1.3rem;" type="submit">Dive in</button>
+</form>
+{{template "auth_footer" .}}
+{{end}}

@@ -1,0 +1,18 @@
+{{define "setup_page"}}
+{{template "auth_header" .}}
+<img class="logo" src="/static/img/dolphin-logo.svg" alt="Flipper logo">
+<h1>Welcome to Flipper</h1>
+<div class="tagline">Let's create your admin account to get started</div>
+{{if .Flash}}<div class="flash {{if .Flash.OK}}ok{{else}}fail{{end}}">{{.Flash.Message}}</div>{{end}}
+<form method="post" action="/setup">
+  <label for="username">Admin username</label>
+  <input id="username" type="text" name="username" autocomplete="username" required autofocus>
+  <label for="password">Password</label>
+  <input id="password" type="password" name="password" autocomplete="new-password" minlength="8" required>
+  <label for="confirm">Confirm password</label>
+  <input id="confirm" type="password" name="confirm" autocomplete="new-password" minlength="8" required>
+  <div class="field-hint">At least 8 characters. You can create additional (non-admin) users later from the admin panel.</div>
+  <button class="btn btn-primary btn-block" style="margin-top:1.3rem;" type="submit">Create admin account</button>
+</form>
+{{template "auth_footer" .}}
+{{end}}

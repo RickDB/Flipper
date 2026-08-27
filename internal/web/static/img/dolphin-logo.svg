@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-label="Flipper the dolphin logo">
+  <defs>
+    <linearGradient id="body" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#5fd9d6"/>
+      <stop offset="55%" stop-color="#17b6a7"/>
+      <stop offset="100%" stop-color="#0e6ba8"/>
+    </linearGradient>
+    <linearGradient id="belly" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#eafcff"/>
+      <stop offset="100%" stop-color="#cdf3f1"/>
+    </linearGradient>
+    <linearGradient id="wave" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#0e6ba8" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#17b6a7" stop-opacity="0.35"/>
+    </linearGradient>
+  </defs>
+
+  <path fill="url(#wave)" d="M0 158c22-10 40-10 62 0s40 10 62 0 40-10 62 0 14 6 14 6v36H0z"/>
+
+  <g>
+    <path fill="url(#body)" d="M36 150
+      C22 118 34 78 74 56
+      C97 43 124 40 145 50
+      C156 55 160 66 152 74
+      C165 72 178 62 186 47
+      C190 66 184 86 168 98
+      C176 104 182 113 183 123
+      C168 116 156 116 146 122
+      C150 136 146 150 134 158
+      C136 145 132 134 122 128
+      C104 140 78 146 58 142
+      C50 152 42 158 32 160
+      C33 156 35 153 36 150 Z"/>
+
+    <path fill="url(#belly)" d="M50 138
+      C46 118 54 96 74 82
+      C68 100 68 118 78 132
+      C68 138 58 140 50 138 Z"/>
+
+    <path fill="url(#body)" d="M150 60
+      C158 52 168 48 178 48
+      C174 58 166 66 156 70
+      C154 66 152 63 150 60 Z"/>
+
+    <path fill="#083049" d="M100 84a5 5 0 1 1 0 10 5 5 0 0 1 0-10Z"/>
+
+    <path fill="url(#body)" opacity="0.9" d="M118 148
+      C126 152 132 160 132 170
+      C124 168 116 162 112 154
+      C114 152 116 150 118 148Z"/>
+  </g>
+
+  <g fill="#ffffff" opacity="0.85">
+    <circle cx="26" cy="60" r="3"/>
+    <circle cx="40" cy="44" r="2"/>
+    <circle cx="16" cy="80" r="2.4"/>
+  </g>
+</svg>

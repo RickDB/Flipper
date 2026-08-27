@@ -1,0 +1,82 @@
+{{define "auth_header"}}<!doctype html>
+<html lang="en" data-theme="flipper">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Flipper</title>
+<link rel="icon" type="image/svg+xml" href="/static/img/dolphin-logo.svg">
+<link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+<div class="bg-bubbles">
+  <span style="left:8%;width:14px;height:14px;animation-duration:9s;animation-delay:0s;"></span>
+  <span style="left:22%;width:9px;height:9px;animation-duration:7s;animation-delay:1.2s;"></span>
+  <span style="left:38%;width:18px;height:18px;animation-duration:11s;animation-delay:2.5s;"></span>
+  <span style="left:55%;width:11px;height:11px;animation-duration:8s;animation-delay:0.8s;"></span>
+  <span style="left:70%;width:15px;height:15px;animation-duration:10s;animation-delay:3s;"></span>
+  <span style="left:85%;width:8px;height:8px;animation-duration:6.5s;animation-delay:1.7s;"></span>
+</div>
+<div class="auth-shell">
+  <div class="auth-card">
+{{end}}
+
+{{define "auth_footer"}}
+  </div>
+</div>
+</body>
+</html>
+{{end}}
+
+{{define "app_header"}}<!doctype html>
+<html lang="en" data-theme="flipper">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Flipper</title>
+<link rel="icon" type="image/svg+xml" href="/static/img/dolphin-logo.svg">
+<link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+<div class="bg-bubbles">
+  <span style="left:8%;width:14px;height:14px;animation-duration:9s;animation-delay:0s;"></span>
+  <span style="left:22%;width:9px;height:9px;animation-duration:7s;animation-delay:1.2s;"></span>
+  <span style="left:38%;width:18px;height:18px;animation-duration:11s;animation-delay:2.5s;"></span>
+  <span style="left:55%;width:11px;height:11px;animation-duration:8s;animation-delay:0.8s;"></span>
+  <span style="left:70%;width:15px;height:15px;animation-duration:10s;animation-delay:3s;"></span>
+  <span style="left:85%;width:8px;height:8px;animation-duration:6.5s;animation-delay:1.7s;"></span>
+</div>
+<header class="site-header">
+  <a class="brand" href="/">
+    <img class="logo" src="/static/img/dolphin-logo.svg" alt="">
+    <span class="brand-text">
+      <span class="name">Flipper</span>
+      <span class="ver">{{.Version}}</span>
+    </span>
+  </a>
+  <nav class="header-nav">
+    {{if .User}}
+      <span class="who">Ahoy, {{.User.Username}}{{if .User.IsAdmin}} (admin){{end}}</span>
+      <a class="btn btn-secondary btn-sm" href="/">Dashboard</a>
+      {{if .User.IsAdmin}}<a class="btn btn-secondary btn-sm" href="/admin">Admin</a>{{end}}
+      <a class="btn btn-secondary btn-sm" href="/account">Account</a>
+      <a class="btn btn-secondary btn-sm" href="/logout">Logout</a>
+    {{end}}
+  </nav>
+</header>
+<main class="main-wrap">
+  {{if .Flash}}<div class="flash {{if .Flash.OK}}ok{{else}}fail{{end}}">{{.Flash.Message}}</div>{{end}}
+{{end}}
+
+{{define "app_footer"}}
+</main>
+<div class="footer-wave">
+  <svg viewBox="0 0 1440 100" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+    <path fill="#04223b" d="M0 40c120 30 240 30 360 10s240-40 360-20 240 50 360 30 240-40 360-10v50H0Z"/>
+  </svg>
+</div>
+<footer class="site-footer">
+  🐬 Flipper {{.Version}} &middot; self-hosted Spotweb &rarr; SABnzbd bridge
+</footer>
+</body>
+</html>
+{{end}}

@@ -1,0 +1,7 @@
+data/
+.env
+cmd/flipper/flipper
+/flipper
+*.db
+*.db-wal
+*.db-shm
