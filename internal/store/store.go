@@ -57,6 +57,7 @@ type HistoryItem struct {
 	Username  string
 	SpotURL   string
 	MessageID string
+	Title     string // release title fetched from Spotweb's API; falls back to MessageID when unavailable
 	Category  string
 	Success   bool
 	Message   string
@@ -113,6 +114,7 @@ CREATE TABLE IF NOT EXISTS history (
 	username   TEXT NOT NULL,
 	spot_url   TEXT NOT NULL,
 	message_id TEXT NOT NULL,
+	title      TEXT NOT NULL DEFAULT '',
 	category   TEXT NOT NULL,
 	success    INTEGER NOT NULL,
 	message    TEXT NOT NULL
@@ -183,6 +185,15 @@ func Open(path string) (*Store, error) {
 		DefaultSettings().SpotwebNZBTemplate, brokenGuessedTemplate); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("healing spotweb_nzb_template: %w", err)
+	}
+
+	// Forward migration for installs created before history rows carried the
+	// release title.
+	if _, err := db.Exec(`ALTER TABLE history ADD COLUMN title TEXT NOT NULL DEFAULT ''`); err != nil {
+		if !strings.Contains(strings.ToLower(err.Error()), "duplicate column") {
+			db.Close()
+			return nil, fmt.Errorf("migrating history table: %w", err)
+		}
 	}
 
 	return &Store{db: db}, nil
@@ -368,9 +379,9 @@ func (s *Store) AddHistory(item HistoryItem) error {
 	}
 	defer tx.Rollback()
 
-	_, err = tx.Exec(`INSERT INTO history (id, timestamp, username, spot_url, message_id, category, success, message)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		item.ID, item.Timestamp, item.Username, item.SpotURL, item.MessageID, item.Category, boolToInt(item.Success), item.Message)
+	_, err = tx.Exec(`INSERT INTO history (id, timestamp, username, spot_url, message_id, title, category, success, message)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		item.ID, item.Timestamp, item.Username, item.SpotURL, item.MessageID, item.Title, item.Category, boolToInt(item.Success), item.Message)
 	if err != nil {
 		return err
 	}
@@ -385,7 +396,7 @@ func (s *Store) AddHistory(item HistoryItem) error {
 }
 
 func (s *Store) ListHistory() []HistoryItem {
-	rows, err := s.db.Query(`SELECT id, timestamp, username, spot_url, message_id, category, success, message
+	rows, err := s.db.Query(`SELECT id, timestamp, username, spot_url, message_id, title, category, success, message
 		FROM history ORDER BY timestamp DESC LIMIT ?`, maxHistory)
 	if err != nil {
 		return nil
@@ -395,7 +406,7 @@ func (s *Store) ListHistory() []HistoryItem {
 	for rows.Next() {
 		var h HistoryItem
 		var success int
-		if err := rows.Scan(&h.ID, &h.Timestamp, &h.Username, &h.SpotURL, &h.MessageID, &h.Category, &success, &h.Message); err != nil {
+		if err := rows.Scan(&h.ID, &h.Timestamp, &h.Username, &h.SpotURL, &h.MessageID, &h.Title, &h.Category, &success, &h.Message); err != nil {
 			continue
 		}
 		h.Success = success != 0

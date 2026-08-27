@@ -30,15 +30,16 @@
   {{if .History}}
   <div style="overflow-x:auto;">
   <table>
-    <thead><tr><th>When</th><th>By</th><th>Category</th><th>Status</th><th>Detail</th></tr></thead>
+    <thead><tr><th>When</th><th>By</th><th>Release</th><th>Category</th><th>Status</th><th>Detail</th></tr></thead>
     <tbody>
     {{range .History}}
       <tr>
         <td>{{fmtTime .Timestamp}}</td>
         <td>{{.Username}}</td>
+        <td style="max-width:22rem;overflow-wrap:anywhere;">{{if .Title}}{{.Title}}{{else}}{{.MessageID}}{{end}}</td>
         <td>{{.Category}}</td>
         <td>{{if .Success}}<span class="badge badge-ok">Added</span>{{else}}<span class="badge badge-fail">Failed</span>{{end}}</td>
-        <td>{{.Message}}</td>
+        <td>{{if .Success}}&mdash;{{else}}{{.Message}}{{end}}</td>
       </tr>
     {{end}}
     </tbody>

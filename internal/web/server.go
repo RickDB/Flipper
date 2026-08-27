@@ -342,13 +342,14 @@ func (s *Server) handleSubmit(w http.ResponseWriter, r *http.Request, sess auth.
 		return
 	}
 
-	record := func(messageID string, success bool, message string) {
+	record := func(messageID, title string, success bool, message string) {
 		_ = s.store.AddHistory(store.HistoryItem{
 			ID:        fmt.Sprintf("%d", time.Now().UnixNano()),
 			Timestamp: time.Now(),
 			Username:  sess.Username,
 			SpotURL:   spotURL,
 			MessageID: messageID,
+			Title:     title,
 			Category:  category,
 			Success:   success,
 			Message:   message,
@@ -357,7 +358,7 @@ func (s *Server) handleSubmit(w http.ResponseWriter, r *http.Request, sess auth.
 
 	messageID, err := spotweb.ExtractMessageID(spotURL)
 	if err != nil {
-		record("", false, err.Error())
+		record("", "", false, err.Error())
 		redirectFlash(w, r, "/", false, err.Error())
 		return
 	}
@@ -371,27 +372,31 @@ func (s *Server) handleSubmit(w http.ResponseWriter, r *http.Request, sess auth.
 	}
 
 	spotClient := spotweb.New(settings.SpotwebURL, settings.SpotwebUsername, settings.SpotwebPassword, settings.SpotwebSkipVerify, settings.SpotwebNZBTemplate)
+
+	// Best-effort: the real release title makes history far more useful than
+	// a bare messageid, but a failure here shouldn't block the actual send.
+	title, err := spotClient.FetchTitle(messageID, apiKey)
+	if err != nil {
+		title = messageID
+	}
+
 	nzb, err := spotClient.FetchNZB(messageID, apiKey)
 	if err != nil {
-		record(messageID, false, "Spotweb: "+err.Error())
+		record(messageID, title, false, "Spotweb: "+err.Error())
 		redirectFlash(w, r, "/", false, "Could not fetch the NZB from Spotweb: "+err.Error())
 		return
 	}
 
 	sabClient := sabnzbd.New(settings.SabnzbdURL, settings.SabnzbdAPIKey, settings.SabnzbdSkipVerify)
-	ids, err := sabClient.AddNZB(sanitizeFilename(messageID)+".nzb", nzb, category)
+	_, err = sabClient.AddNZB(sanitizeFilename(messageID)+".nzb", nzb, category)
 	if err != nil {
-		record(messageID, false, "SABnzbd: "+err.Error())
+		record(messageID, title, false, "SABnzbd: "+err.Error())
 		redirectFlash(w, r, "/", false, "SABnzbd rejected the release: "+err.Error())
 		return
 	}
 
-	okMsg := "Added to SABnzbd"
-	if len(ids) > 0 {
-		okMsg = "Added to SABnzbd (" + strings.Join(ids, ", ") + ")"
-	}
-	record(messageID, true, okMsg)
-	redirectFlash(w, r, "/", true, "🐬 Sent to SABnzbd under category \""+category+"\"")
+	record(messageID, title, true, "Added to SABnzbd: "+title)
+	redirectFlash(w, r, "/", true, "🐬 Sent \""+title+"\" to SABnzbd under category \""+category+"\"")
 }
 
 func sanitizeFilename(s string) string {

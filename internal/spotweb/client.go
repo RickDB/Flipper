@@ -8,6 +8,7 @@ package spotweb
 
 import (
 	"crypto/tls"
+	"encoding/xml"
 	"fmt"
 	"io"
 	"net/http"
@@ -107,6 +108,56 @@ func (c *Client) TestConnection() error {
 		return fmt.Errorf("reached %s but it didn't return the expected Spotweb API response — is the URL correct?", c.BaseURL)
 	}
 	return nil
+}
+
+type detailsResponse struct {
+	Channel struct {
+		Item struct {
+			Title string `xml:"title"`
+		} `xml:"item"`
+	} `xml:"channel"`
+}
+
+// FetchTitle looks up the human-readable release title for a messageid via
+// Spotweb's Newznab-compatible details action ({base}/api?t=details&id=...).
+// This is always at the fixed /api path (unlike FetchNZB's URL, it was never
+// in question — only the download action's URL shape was ever a guess), so
+// it isn't driven by NZBTemplate. Best-effort: callers should treat a
+// non-nil error as "no title available" rather than fail the whole submit.
+func (c *Client) FetchTitle(messageID, apiKey string) (string, error) {
+	if c.BaseURL == "" {
+		return "", fmt.Errorf("Spotweb URL is not configured")
+	}
+	detailsURL := c.BaseURL + "/api?t=details&id=" + url.QueryEscape(messageID) + "&apikey=" + url.QueryEscape(apiKey)
+
+	req, err := http.NewRequest(http.MethodGet, detailsURL, nil)
+	if err != nil {
+		return "", err
+	}
+	c.setAuth(req)
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("could not reach Spotweb: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20)) // 1MB cap
+	if err != nil {
+		return "", err
+	}
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("Spotweb returned HTTP %d fetching spot details", resp.StatusCode)
+	}
+
+	var parsed detailsResponse
+	if err := xml.Unmarshal(body, &parsed); err != nil {
+		return "", fmt.Errorf("could not parse Spotweb's details response: %w", err)
+	}
+	title := strings.TrimSpace(parsed.Channel.Item.Title)
+	if title == "" {
+		return "", fmt.Errorf("Spotweb didn't return a title for this spot")
+	}
+	return title, nil
 }
 
 // FetchNZB builds the NZB download URL for the given messageid and fetches

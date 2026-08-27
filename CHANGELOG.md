@@ -12,6 +12,8 @@
   old, broken guess in their settings row forever. Boot now auto-heals it
   in place (only when it's still exactly the old broken value, so a
   manually customized template is left alone).
+- Send confirmations and history now show the real Spotweb release title
+  (fetched via `t=details`) instead of SABnzbd's internal job ID.
 - New: admin-managed local folder shares. Admins name and assign folders to
   specific users; assigned users get an inline browser on the dashboard
   (breadcrumbs, file downloads, whole-folder zip downloads, auto-refresh)
