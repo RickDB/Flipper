@@ -416,6 +416,16 @@ code { background: #eef6f8; padding: 0.1em 0.4em; border-radius: 5px; font-size:
 #downloads-list { display: grid; gap: 0.65rem; }
 .downloads-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
 .downloads-heading h2, .downloads-heading form { margin: 0; }
+.downloads-heading + .card-sub { margin-bottom: 0.55rem; }
+.downloads-summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin: 0 0 1rem 2.225rem;
+  color: var(--ink-soft);
+  font-size: 0.76rem;
+}
+.downloads-summary strong { color: var(--deep); }
 .downloads-clear, .download-clear {
   border: 0;
   background: transparent;

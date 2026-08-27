@@ -3,6 +3,7 @@ package web
 import (
 	"embed"
 	"fmt"
+	"html"
 	"html/template"
 )
 
@@ -14,10 +15,11 @@ var staticFS embed.FS
 
 func loadTemplates() (*template.Template, error) {
 	return template.New("").Funcs(template.FuncMap{
-		"fmtTime":      fmtTime,
-		"isAllowed":    isAllowed,
-		"inIntSlice":   inIntSlice,
-		"humanizeSize": humanizeSize,
+		"fmtTime":        fmtTime,
+		"isAllowed":      isAllowed,
+		"inIntSlice":     inIntSlice,
+		"humanizeSize":   humanizeSize,
+		"decodeEntities": html.UnescapeString,
 	}).ParseFS(templateFS, "templates/*.html")
 }
 

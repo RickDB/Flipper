@@ -4,6 +4,13 @@
 
 - No unreleased changes yet.
 
+## 0.07 — 2026-08-27
+
+- Downloads now separates its explanatory text from item/page counts for a
+  cleaner card hierarchy.
+- Spotweb titles with nested HTML entity encoding are normalized before
+  display, preventing literal text such as `&amp;` in release names.
+
 ## 0.06 — 2026-08-27
 
 - Recent History and Downloads now paginate independently at five items per

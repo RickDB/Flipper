@@ -10,6 +10,7 @@ import (
 	"crypto/tls"
 	"encoding/xml"
 	"fmt"
+	"html"
 	"io"
 	"net/http"
 	"net/url"
@@ -153,7 +154,7 @@ func (c *Client) FetchTitle(messageID, apiKey string) (string, error) {
 	if err := xml.Unmarshal(body, &parsed); err != nil {
 		return "", fmt.Errorf("could not parse Spotweb's details response: %w", err)
 	}
-	title := strings.TrimSpace(parsed.Channel.Item.Title)
+	title := strings.TrimSpace(html.UnescapeString(parsed.Channel.Item.Title))
 	if title == "" {
 		return "", fmt.Errorf("Spotweb didn't return a title for this spot")
 	}

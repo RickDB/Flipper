@@ -174,6 +174,8 @@ size remaining, estimated time left, and states such as queued, downloading,
 repairing, unpacking, failed, or completed. An item can be removed from this
 tracking card individually or in bulk; doing so never cancels or removes the
 actual SABnzbd job and does not delete the corresponding Flipper history row.
+The card keeps its explanatory text and page/item counts on separate rows for
+clearer scanning.
 Jobs submitted before version 0.05 do not have a stored SABnzbd ID and
 therefore cannot appear retroactively in the Downloads card.
 
@@ -196,4 +198,4 @@ self-signed certs. Leave it unchecked unless you need it.
 
 ## Version
 
-Current version: **0.06**
+Current version: **0.07**

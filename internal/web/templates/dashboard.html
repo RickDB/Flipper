@@ -48,7 +48,7 @@
       <tr>
         <td>{{fmtTime .Timestamp}}</td>
         <td>{{.Username}}</td>
-        <td style="max-width:22rem;overflow-wrap:anywhere;">{{if .SpotURL}}<a href="{{.SpotURL}}" target="_blank" rel="noopener noreferrer">{{if .Title}}{{.Title}}{{else}}{{.MessageID}}{{end}}</a>{{else}}{{if .Title}}{{.Title}}{{else}}{{.MessageID}}{{end}}{{end}}</td>
+        <td style="max-width:22rem;overflow-wrap:anywhere;">{{if .SpotURL}}<a href="{{.SpotURL}}" target="_blank" rel="noopener noreferrer">{{if .Title}}{{decodeEntities .Title}}{{else}}{{.MessageID}}{{end}}</a>{{else}}{{if .Title}}{{decodeEntities .Title}}{{else}}{{.MessageID}}{{end}}{{end}}</td>
         <td>{{.Category}}</td>
         <td>{{if .Success}}<span class="badge badge-ok">Added</span>{{else}}<span class="badge badge-fail">Failed</span>{{end}}</td>
         <td>{{if .Success}}&mdash;{{else}}{{.Message}}{{end}}</td>
@@ -106,10 +106,16 @@
     </form>
     {{end}}
   </div>
-  <div class="card-sub">Live SABnzbd progress for the latest releases added through Flipper. {{if .DownloadTotal}}Showing {{len .Downloads}} of {{.DownloadTotal}} (page {{.DownloadPage}} of {{.DownloadTotalPages}}).{{end}}</div>
+  <div class="card-sub">Live SABnzbd progress for the latest releases added through Flipper.</div>
+  {{if .DownloadTotal}}
+  <div class="downloads-summary">
+    <span>Showing <strong>{{len .Downloads}}</strong> of <strong>{{.DownloadTotal}}</strong></span>
+    <span>Page <strong>{{.DownloadPage}}</strong> of <strong>{{.DownloadTotalPages}}</strong></span>
+  </div>
+  {{end}}
   <div id="downloads-list" data-status-url="/downloads/status?dpage={{.DownloadPage}}">
     {{if .Downloads}}
-      {{range .Downloads}}<div class="download-item loading"><strong>{{.Title}}</strong><span>Checking SABnzbd…</span></div>{{end}}
+      {{range .Downloads}}<div class="download-item loading"><strong>{{decodeEntities .Title}}</strong><span>Checking SABnzbd…</span></div>{{end}}
     {{else}}
       <div class="empty-state">No tracked downloads yet.</div>
     {{end}}

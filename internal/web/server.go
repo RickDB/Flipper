@@ -6,6 +6,7 @@ package web
 import (
 	"encoding/json"
 	"fmt"
+	"html"
 	"html/template"
 	"log/slog"
 	"net/http"
@@ -417,7 +418,7 @@ func (s *Server) handleDownloadStatus(w http.ResponseWriter, r *http.Request, se
 		status, found := statuses[download.NZOID]
 		items = append(items, map[string]any{
 			"historyId": download.ID,
-			"title":     download.Title,
+			"title":     html.UnescapeString(download.Title),
 			"nzoId":     download.NZOID,
 			"found":     found,
 			"status":    status,
