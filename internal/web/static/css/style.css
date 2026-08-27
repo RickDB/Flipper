@@ -397,8 +397,9 @@ code { background: #eef6f8; padding: 0.1em 0.4em; border-radius: 5px; font-size:
 .pager-page:hover { border-color: var(--teal); }
 .pager-page.active { background: linear-gradient(135deg, var(--teal), var(--ocean2)); color: #fff; border-color: transparent; }
 
-.history-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.history-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
 .history-heading h2 { margin-bottom: 0; }
+.history-heading + .card-sub, .downloads-heading + .card-sub { padding-left: 2.225rem; }
 .history-heading form, .history-delete { margin: 0; }
 .history-clear, .history-delete {
   border: 0;
@@ -413,7 +414,7 @@ code { background: #eef6f8; padding: 0.1em 0.4em; border-radius: 5px; font-size:
 .history-delete { padding: 0.25rem; font-size: 0.95rem; }
 
 #downloads-list { display: grid; gap: 0.65rem; }
-.downloads-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.downloads-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
 .downloads-heading h2, .downloads-heading form { margin: 0; }
 .downloads-clear, .download-clear {
   border: 0;

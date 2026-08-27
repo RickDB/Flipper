@@ -445,11 +445,21 @@ func (s *Store) ListHistoryPage(offset, limit int) []HistoryItem {
 	return out
 }
 
-// ListTrackedDownloads returns the newest successful submissions that have
-// a SABnzbd job id, for live queue/history status display.
-func (s *Store) ListTrackedDownloads(limit int) []HistoryItem {
+// CountTrackedDownloads returns the number of submissions still shown in
+// Flipper's Downloads card.
+func (s *Store) CountTrackedDownloads() int {
+	var n int
+	if err := s.db.QueryRow(`SELECT COUNT(*) FROM history WHERE success = 1 AND nzo_id <> ''`).Scan(&n); err != nil {
+		return 0
+	}
+	return n
+}
+
+// ListTrackedDownloads returns a page of successful submissions that have
+// a SABnzbd job id, newest first, for live queue/history status display.
+func (s *Store) ListTrackedDownloads(offset, limit int) []HistoryItem {
 	rows, err := s.db.Query(`SELECT id, timestamp, username, spot_url, message_id, nzo_id, title, category, success, message
-		FROM history WHERE success = 1 AND nzo_id <> '' ORDER BY timestamp DESC LIMIT ?`, limit)
+		FROM history WHERE success = 1 AND nzo_id <> '' ORDER BY timestamp DESC LIMIT ? OFFSET ?`, limit, offset)
 	if err != nil {
 		return nil
 	}

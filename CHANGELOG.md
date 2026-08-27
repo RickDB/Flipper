@@ -4,6 +4,15 @@
 
 - No unreleased changes yet.
 
+## 0.06 — 2026-08-27
+
+- Recent History and Downloads now paginate independently at five items per
+  page, with Downloads placed below Shared Folders in the right column.
+- Shared-folder entries are sorted newest-modified first by default, with
+  directories grouped before files.
+- History and Downloads headings/descriptions have corrected alignment, and
+  regular-user bulk actions are labeled "Clear all."
+
 ## 0.05 — 2026-08-27
 
 - Users can delete individual history entries they own or clear all of their

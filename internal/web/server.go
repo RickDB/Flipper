@@ -310,27 +310,31 @@ func (s *Server) handleSetupSubmit(w http.ResponseWriter, r *http.Request) {
 
 // --- dashboard / submit --------------------------------------------------
 
-const historyPageSize = 10
+const dashboardPageSize = 5
 
 type dashboardData struct {
 	Base
-	Categories        []string
-	DefaultCategory   string
-	History           []store.HistoryItem
-	Downloads         []store.HistoryItem
-	PrefillURL        string
-	Shares            []store.Share
-	HistoryTotal      int
-	HistoryPage       int
-	HistoryTotalPages int
-	HistoryPages      []int
+	Categories         []string
+	DefaultCategory    string
+	History            []store.HistoryItem
+	Downloads          []store.HistoryItem
+	PrefillURL         string
+	Shares             []store.Share
+	HistoryTotal       int
+	HistoryPage        int
+	HistoryTotalPages  int
+	HistoryPages       []int
+	DownloadTotal      int
+	DownloadPage       int
+	DownloadTotalPages int
+	DownloadPages      []int
 }
 
 func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request, sess auth.Session) {
 	settings := s.store.GetSettings()
 
 	total := s.store.CountHistory()
-	totalPages := (total + historyPageSize - 1) / historyPageSize
+	totalPages := (total + dashboardPageSize - 1) / dashboardPageSize
 	if totalPages < 1 {
 		totalPages = 1
 	}
@@ -345,26 +349,58 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request, sess au
 	for i := range pages {
 		pages[i] = i + 1
 	}
+	downloadTotal := s.store.CountTrackedDownloads()
+	downloadTotalPages := (downloadTotal + dashboardPageSize - 1) / dashboardPageSize
+	if downloadTotalPages < 1 {
+		downloadTotalPages = 1
+	}
+	downloadPage := 1
+	if p, err := strconv.Atoi(r.URL.Query().Get("dpage")); err == nil && p > 0 {
+		downloadPage = p
+	}
+	if downloadPage > downloadTotalPages {
+		downloadPage = downloadTotalPages
+	}
+	downloadPages := make([]int, downloadTotalPages)
+	for i := range downloadPages {
+		downloadPages[i] = i + 1
+	}
 
 	base := s.base(&sess, r)
 	base.WideLayout = true
 	data := dashboardData{
-		Base:              base,
-		Categories:        settings.AllowedCategories,
-		DefaultCategory:   settings.DefaultCategory,
-		History:           s.store.ListHistoryPage((page-1)*historyPageSize, historyPageSize),
-		Downloads:         s.store.ListTrackedDownloads(10),
-		Shares:            s.store.ListSharesForUser(sess.UserID, sess.IsAdmin),
-		HistoryTotal:      total,
-		HistoryPage:       page,
-		HistoryTotalPages: totalPages,
-		HistoryPages:      pages,
+		Base:               base,
+		Categories:         settings.AllowedCategories,
+		DefaultCategory:    settings.DefaultCategory,
+		History:            s.store.ListHistoryPage((page-1)*dashboardPageSize, dashboardPageSize),
+		Downloads:          s.store.ListTrackedDownloads((downloadPage-1)*dashboardPageSize, dashboardPageSize),
+		Shares:             s.store.ListSharesForUser(sess.UserID, sess.IsAdmin),
+		HistoryTotal:       total,
+		HistoryPage:        page,
+		HistoryTotalPages:  totalPages,
+		HistoryPages:       pages,
+		DownloadTotal:      downloadTotal,
+		DownloadPage:       downloadPage,
+		DownloadTotalPages: downloadTotalPages,
+		DownloadPages:      downloadPages,
 	}
 	s.render(w, "dashboard_page", data)
 }
 
 func (s *Server) handleDownloadStatus(w http.ResponseWriter, r *http.Request, sess auth.Session) {
-	downloads := s.store.ListTrackedDownloads(10)
+	total := s.store.CountTrackedDownloads()
+	totalPages := (total + dashboardPageSize - 1) / dashboardPageSize
+	if totalPages < 1 {
+		totalPages = 1
+	}
+	page := 1
+	if p, err := strconv.Atoi(r.URL.Query().Get("dpage")); err == nil && p > 0 {
+		page = p
+	}
+	if page > totalPages {
+		page = totalPages
+	}
+	downloads := s.store.ListTrackedDownloads((page-1)*dashboardPageSize, dashboardPageSize)
 	ids := make([]string, 0, len(downloads))
 	for _, download := range downloads {
 		ids = append(ids, download.NZOID)

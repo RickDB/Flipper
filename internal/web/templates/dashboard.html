@@ -32,7 +32,7 @@
     <h2><span class="emoji-icon">📜</span> Recent history</h2>
     {{if .HistoryTotal}}
     <form method="post" action="/history/delete-all" onsubmit="return confirm('{{if .User.IsAdmin}}Permanently delete all history for every user?{{else}}Permanently delete all of your history entries?{{end}}\n\nThis cannot be undone.');">
-      <button type="submit" class="history-clear">🗑 {{if .User.IsAdmin}}Clear all{{else}}Clear mine{{end}}</button>
+      <button type="submit" class="history-clear">🗑 Clear all</button>
     </form>
     {{end}}
   </div>
@@ -68,7 +68,7 @@
       {{if eq . $.HistoryPage}}
       <span class="pager-page active">{{.}}</span>
       {{else}}
-      <a class="pager-page" href="/?hpage={{.}}">{{.}}</a>
+      <a class="pager-page" href="/?hpage={{.}}&amp;dpage={{$.DownloadPage}}">{{.}}</a>
       {{end}}
     {{end}}
   </div>
@@ -76,25 +76,6 @@
   {{else}}
   <div class="empty-state">Nothing sent yet — items you send will show up here.</div>
   {{end}}
-</div>
-
-<div class="card" id="downloads-card">
-  <div class="downloads-heading">
-    <h2><span class="emoji-icon">⬇️</span> Downloads</h2>
-    {{if .Downloads}}
-    <form method="post" action="/downloads/clear-all" onsubmit="return confirm('{{if .User.IsAdmin}}Clear all tracked downloads for every user?{{else}}Clear all of your tracked downloads?{{end}}\n\nThis only removes them from this card; SABnzbd jobs are not changed.');">
-      <button type="submit" class="downloads-clear">🧹 {{if .User.IsAdmin}}Clear all{{else}}Clear mine{{end}}</button>
-    </form>
-    {{end}}
-  </div>
-  <div class="card-sub">Live SABnzbd progress for the latest releases added through Flipper.</div>
-  <div id="downloads-list">
-    {{if .Downloads}}
-      {{range .Downloads}}<div class="download-item loading"><strong>{{.Title}}</strong><span>Checking SABnzbd…</span></div>{{end}}
-    {{else}}
-      <div class="empty-state">No tracked downloads yet.</div>
-    {{end}}
-  </div>
 </div>
 
 </div>
@@ -113,6 +94,36 @@
   <div class="share-listing" id="share-listing"></div>
   {{else}}
   <div class="empty-state">No shared folders yet — ask an admin to share one with you.</div>
+  {{end}}
+</div>
+
+<div class="card" id="downloads-card">
+  <div class="downloads-heading">
+    <h2><span class="emoji-icon">⬇️</span> Downloads</h2>
+    {{if .Downloads}}
+    <form method="post" action="/downloads/clear-all" onsubmit="return confirm('{{if .User.IsAdmin}}Clear all tracked downloads for every user?{{else}}Clear all of your tracked downloads?{{end}}\n\nThis only removes them from this card; SABnzbd jobs are not changed.');">
+      <button type="submit" class="downloads-clear">🧹 Clear all</button>
+    </form>
+    {{end}}
+  </div>
+  <div class="card-sub">Live SABnzbd progress for the latest releases added through Flipper. {{if .DownloadTotal}}Showing {{len .Downloads}} of {{.DownloadTotal}} (page {{.DownloadPage}} of {{.DownloadTotalPages}}).{{end}}</div>
+  <div id="downloads-list" data-status-url="/downloads/status?dpage={{.DownloadPage}}">
+    {{if .Downloads}}
+      {{range .Downloads}}<div class="download-item loading"><strong>{{.Title}}</strong><span>Checking SABnzbd…</span></div>{{end}}
+    {{else}}
+      <div class="empty-state">No tracked downloads yet.</div>
+    {{end}}
+  </div>
+  {{if gt .DownloadTotalPages 1}}
+  <div class="pager">
+    {{range .DownloadPages}}
+      {{if eq . $.DownloadPage}}
+      <span class="pager-page active">{{.}}</span>
+      {{else}}
+      <a class="pager-page" href="/?hpage={{$.HistoryPage}}&amp;dpage={{.}}">{{.}}</a>
+      {{end}}
+    {{end}}
+  </div>
   {{end}}
 </div>
 
@@ -171,7 +182,7 @@
   function refresh() {
     if (refreshing) return;
     refreshing = true;
-    fetch('/downloads/status', {headers: {'Accept': 'application/json'}})
+    fetch(list.getAttribute('data-status-url'), {headers: {'Accept': 'application/json'}})
       .then(function (r) { return r.json(); })
       .then(render)
       .catch(function () {})

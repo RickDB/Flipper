@@ -105,7 +105,7 @@ func TestClearingDownloadsOnlyRemovesOwnedTracking(t *testing.T) {
 	if err := s.ClearTrackedDownloads("alice", false); err != nil {
 		t.Fatal(err)
 	}
-	tracked := s.ListTrackedDownloads(10)
+	tracked := s.ListTrackedDownloads(0, 10)
 	if len(tracked) != 1 || tracked[0].NZOID != "nzo-b1" {
 		t.Fatalf("tracked downloads after clearing alice = %+v, want only bob", tracked)
 	}

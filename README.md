@@ -29,7 +29,8 @@ themed UI. Default port **19012**.
 - A dedicated Downloads card tracks the latest jobs submitted through
   Flipper and refreshes from SABnzbd every three seconds, showing state,
   percentage done/left, remaining size, and estimated time. Tracking can be
-  cleared without cancelling or deleting the underlying SABnzbd job.
+  cleared without cancelling or deleting the underlying SABnzbd job. It is
+  placed below Shared Folders in the dashboard's right column.
 - Admin can share local folders with specific users under a name of the
   admin's choosing (independent of the real folder path). Assigned users
   get an inline browser right on the dashboard — no page reloads — with
@@ -146,6 +147,8 @@ go in, click a file's download link to grab it, or "Download this folder as
 .zip" for the whole thing). The listing re-fetches itself every 15 seconds,
 so a file dropped into a shared folder on disk shows up without anyone
 reloading the page — there's no filesystem watcher, just a cheap poll.
+Directories are grouped before files and each group defaults to newest
+modification time first.
 
 Path handling is defensive: every browse/download/zip/delete request re-resolves
 the requested path against the share's root and rejects anything that would
@@ -157,13 +160,15 @@ first — see the commented example in [`compose.yaml`](compose.yaml).
 
 ## History and live downloads
 
-Flipper keeps the newest 100 send attempts and displays them 10 per page.
+Flipper keeps the newest 100 send attempts and displays them 5 per page.
 Each successful release links back to its submitted Spotweb URL. Regular
 users can delete individual entries they own or clear their own history;
-admins can delete any entry or clear history for everyone.
+admins can delete any entry or clear history for everyone. The History and
+Downloads cards paginate independently, so changing one does not reset the
+other.
 
 For newly submitted releases, Flipper stores SABnzbd's returned job ID and
-shows it in a separate Downloads card. The card polls SABnzbd's queue and
+shows it in a separate Downloads card, 5 items per page. The card polls SABnzbd's queue and
 history every three seconds and reports download percentage, percentage and
 size remaining, estimated time left, and states such as queued, downloading,
 repairing, unpacking, failed, or completed. An item can be removed from this
@@ -191,4 +196,4 @@ self-signed certs. Leave it unchecked unless you need it.
 
 ## Version
 
-Current version: **0.05**
+Current version: **0.06**

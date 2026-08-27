@@ -44,8 +44,8 @@ func ResolvePath(root, relPath string) (string, error) {
 }
 
 // List returns the immediate contents of a directory, directories first,
-// then files, both alphabetical. Always reads live from disk — there is no
-// caching, so it reflects whatever is on disk at call time.
+// then files, newest-modified first within each group. Names provide a
+// stable tie-breaker. Always reads live from disk.
 func List(absPath string) ([]Entry, error) {
 	dirEntries, err := os.ReadDir(absPath)
 	if err != nil {
@@ -69,6 +69,9 @@ func List(absPath string) ([]Entry, error) {
 	sort.Slice(entries, func(i, j int) bool {
 		if entries[i].IsDir != entries[j].IsDir {
 			return entries[i].IsDir // directories first
+		}
+		if !entries[i].ModTime.Equal(entries[j].ModTime) {
+			return entries[i].ModTime.After(entries[j].ModTime)
 		}
 		return strings.ToLower(entries[i].Name) < strings.ToLower(entries[j].Name)
 	})
